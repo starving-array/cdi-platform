@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: cdi-backend
+  profiles:
+    active: local
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/cdi}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

@@ -1,0 +1,8 @@
+spring:
+  # The DataSource is supplied by Spring Boot through the @ServiceConnection
+  # PostgreSQL Testcontainer defined in PostgresTestContainerConfiguration.
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
