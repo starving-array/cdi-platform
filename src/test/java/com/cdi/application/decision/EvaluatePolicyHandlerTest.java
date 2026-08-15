@@ -442,6 +442,12 @@ class EvaluatePolicyHandlerTest {
       }
       return Optional.ofNullable(policy);
     }
+
+    @Override
+    public Policy save(Policy policy) {
+      this.policy = policy;
+      return policy;
+    }
   }
 
   private static class FakeDecisionRecordRepository implements DecisionRecordRepository {

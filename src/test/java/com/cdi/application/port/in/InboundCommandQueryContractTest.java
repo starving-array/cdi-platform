@@ -9,9 +9,18 @@ import com.cdi.common.domain.id.PolicyId;
 import com.cdi.common.domain.id.RepositoryId;
 import com.cdi.common.domain.id.ServiceId;
 import com.cdi.common.domain.id.TenantId;
+import com.cdi.decision.domain.DecisionOutcome;
+import com.cdi.decision.domain.RequiredAction;
+import com.cdi.policy.domain.PolicyRule;
+import com.cdi.policy.domain.PolicyVersion;
 import com.cdi.repository.domain.Repository;
+import com.cdi.risk.domain.EvidenceState;
+import com.cdi.risk.domain.RiskLevel;
 import com.cdi.systemcontext.domain.CriticalityTier;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -241,5 +250,86 @@ class InboundCommandQueryContractTest {
     CreateServiceCommand withNullOwner = new CreateServiceCommand(
         tenantId, "name", CriticalityTier.TIER_0, null, actor, key);
     assertNull(withNullOwner.owner());
+  }
+
+  @Test
+  void shouldConstructCreatePolicyCommand() {
+    TenantId tenantId = TenantId.generate();
+    PolicyRule rule = new PolicyRule("R1", Set.of(), Set.of(), Set.of(),
+        DecisionOutcome.APPROVE, List.of(), "Explanation");
+    CreatePolicyCommand command = new CreatePolicyCommand(
+        tenantId, "core-policy", "description", PolicyVersion.of("v1"),
+        List.of(rule), actor, key);
+
+    assertEquals(tenantId, command.tenantId());
+    assertEquals("core-policy", command.name());
+    assertEquals("description", command.description());
+    assertEquals("v1", command.version().value());
+    assertEquals(1, command.rules().size());
+    assertEquals(rule, command.rules().get(0));
+    assertEquals(actor, command.actor());
+    assertEquals(key, command.idempotencyKey());
+  }
+
+  @Test
+  void shouldTrimStringFieldsInCreatePolicyCommand() {
+    PolicyRule rule = new PolicyRule("R1", Set.of(), Set.of(), Set.of(),
+        DecisionOutcome.APPROVE, List.of(), "Explanation");
+    CreatePolicyCommand command = new CreatePolicyCommand(
+        TenantId.generate(), "  core-policy  ", "  description  ",
+        PolicyVersion.of("v1"), List.of(rule), actor, key);
+
+    assertEquals("core-policy", command.name());
+    assertEquals("description", command.description());
+  }
+
+  @Test
+  void shouldRejectInvalidCreatePolicyCommand() {
+    TenantId tenantId = TenantId.generate();
+    PolicyRule rule = new PolicyRule("R1", Set.of(), Set.of(), Set.of(),
+        DecisionOutcome.APPROVE, List.of(), "Explanation");
+    // null tenantId
+    assertThrows(DomainException.class, () -> new CreatePolicyCommand(
+        null, "name", "", PolicyVersion.of("v1"), List.of(rule), actor, key));
+    // blank name
+    assertThrows(DomainException.class, () -> new CreatePolicyCommand(
+        tenantId, "   ", "", PolicyVersion.of("v1"), List.of(rule), actor, key));
+    // null version
+    assertThrows(DomainException.class, () -> new CreatePolicyCommand(
+        tenantId, "name", "", null, List.of(rule), actor, key));
+    // empty rules
+    assertThrows(DomainException.class, () -> new CreatePolicyCommand(
+        tenantId, "name", "", PolicyVersion.of("v1"), List.of(), actor, key));
+    // null actor
+    assertThrows(DomainException.class, () -> new CreatePolicyCommand(
+        tenantId, "name", "", PolicyVersion.of("v1"), List.of(rule), null, key));
+    // null idempotencyKey
+    assertThrows(DomainException.class, () -> new CreatePolicyCommand(
+        tenantId, "name", "", PolicyVersion.of("v1"), List.of(rule), actor, null));
+  }
+
+  @Test
+  void shouldConstructCreatePolicyCommandWithFullRule() {
+    TenantId tenantId = TenantId.generate();
+    PolicyRule rule = new PolicyRule(
+        "R1",
+        Set.of(CriticalityTier.TIER_0, CriticalityTier.TIER_1),
+        Set.of(RiskLevel.HIGH, RiskLevel.CRITICAL),
+        Set.of(EvidenceState.EVIDENCE_AVAILABLE),
+        DecisionOutcome.REVIEW_REQUIRED,
+        List.of(RequiredAction.HUMAN_REVIEW, RequiredAction.SECURITY_REVIEW),
+        "Requires human review");
+    CreatePolicyCommand command = new CreatePolicyCommand(
+        tenantId, "core-policy", "", PolicyVersion.of("v2"),
+        List.of(rule), actor, key);
+
+    PolicyRule stored = command.rules().get(0);
+    assertEquals("R1", stored.ruleId());
+    assertEquals(Set.of(CriticalityTier.TIER_0, CriticalityTier.TIER_1), stored.targetTiers());
+    assertEquals(Set.of(RiskLevel.HIGH, RiskLevel.CRITICAL), stored.targetRiskLevels());
+    assertEquals(Set.of(EvidenceState.EVIDENCE_AVAILABLE), stored.requiredEvidenceStates());
+    assertEquals(DecisionOutcome.REVIEW_REQUIRED, stored.outcome());
+    assertEquals(List.of(RequiredAction.HUMAN_REVIEW, RequiredAction.SECURITY_REVIEW), stored.actions());
+    assertEquals("Requires human review", stored.explanation());
   }
 }

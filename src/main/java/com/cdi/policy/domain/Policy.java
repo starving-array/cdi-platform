@@ -44,6 +44,23 @@ public class Policy {
         this.createdAt = Objects.requireNonNull(createdAt, "CreatedAt timestamp cannot be null");
     }
 
+    /**
+     * Reconstructs a Policy from its persisted state.
+     *
+     * <p>Framework-independent hydration factory used by persistence adapters
+     * to rebuild the aggregate exactly as stored: status and version are
+     * supplied explicitly rather than defaulted by the constructor. This is a
+     * persistence-read helper; it performs no state transitions and does not
+     * alter existing constructor semantics. Mirrors {@code Organization#restore}
+     * and {@code Service#restore} (UC-07/UC-09 precedent).
+     */
+    public static Policy restore(PolicyId id, TenantId tenantId, String name, String description,
+                                 PolicyStatus status, PolicyVersion version,
+                                 List<PolicyRule> rules, Instant createdAt) {
+        Policy policy = new Policy(id, tenantId, name, description, status, version, rules, createdAt);
+        return policy;
+    }
+
     public PolicyId getId() { return id; }
     public TenantId getTenantId() { return tenantId; }
     public String getName() { return name; }

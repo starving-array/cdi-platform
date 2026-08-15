@@ -492,6 +492,12 @@ class OrchestrationChainTest {
     public Optional<Policy> findActiveByTenant(TenantId tenantId) {
       return Optional.ofNullable(policy);
     }
+
+    @Override
+    public Policy save(Policy policy) {
+      this.policy = policy;
+      return policy;
+    }
   }
 
   private static class FakeDecisionRecordRepository implements DecisionRecordRepository {
