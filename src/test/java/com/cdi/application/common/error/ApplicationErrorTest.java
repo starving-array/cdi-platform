@@ -23,6 +23,8 @@ class ApplicationErrorTest {
     assertTrue(ApplicationError.AGENT_INVESTIGATION_FAILED.retryable());
 
     assertFalse(ApplicationError.CHANGE_NOT_FOUND.retryable());
+    assertFalse(ApplicationError.ANALYSIS_RUN_NOT_FOUND.retryable());
+    assertFalse(ApplicationError.ORGANIZATION_NOT_FOUND.retryable());
     assertFalse(ApplicationError.ANALYSIS_ALREADY_RUNNING.retryable());
     assertFalse(ApplicationError.ANALYSIS_SUPERSEDED.retryable());
     assertFalse(ApplicationError.INSUFFICIENT_CONTEXT.retryable());
@@ -33,6 +35,6 @@ class ApplicationErrorTest {
 
   @Test
   void shouldCoverTheDocumentedCanonicalCatalog() {
-    assertEquals(9, ApplicationError.values().length);
+    assertEquals(10, ApplicationError.values().length);
   }
 }

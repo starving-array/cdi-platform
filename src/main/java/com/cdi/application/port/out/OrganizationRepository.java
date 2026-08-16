@@ -1,18 +1,21 @@
 package com.cdi.application.port.out;
 
+import com.cdi.common.domain.id.TenantId;
 import com.cdi.organization.domain.Organization;
 
 import java.util.Optional;
 
 /**
  * Outbound persistence port for the Organization (tenant) aggregate, used by
- * UC-07 CreateOrganization (application-layer.md §6). Adapters persist to the
- * {@code tenant} table (data-model.md §3.A), keyed by the organization's own
- * {@code id} which doubles as the tenant identity.
+ * UC-07 CreateOrganization and UC-13 GetOrganization (application-layer.md
+ * §6). Adapters persist to the {@code tenant} table (data-model.md §3.A),
+ * keyed by the organization's own {@code id} which doubles as the tenant
+ * identity.
  *
- * <p>Only the operations genuinely required by UC-07 are declared: the
- * natural-key (name) lookup that drives duplicate detection and the insert.
- * No JPA, Spring Data, SQL, or PostgreSQL types appear on this contract.
+ * <p>Only the operations genuinely required by those use cases are declared:
+ * the natural-key (name) lookup that drives duplicate detection, the
+ * tenant-keyed lookup that serves UC-13 reads, and the insert. No JPA, Spring
+ * Data, SQL, or PostgreSQL types appear on this contract.
  *
  * <p><b>Tenant-isolation note</b>: the {@code findByName} lookup is global
  * (not tenant-scoped) because the Organization <em>is</em> the tenant root
@@ -24,6 +27,8 @@ import java.util.Optional;
 public interface OrganizationRepository {
 
   Optional<Organization> findByName(String name);
+
+  Optional<Organization> findById(TenantId tenantId);
 
   Organization save(Organization organization);
 }

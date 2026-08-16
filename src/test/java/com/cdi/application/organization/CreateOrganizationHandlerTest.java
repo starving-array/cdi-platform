@@ -199,6 +199,13 @@ class CreateOrganizationHandlerTest {
     }
 
     @Override
+    public Optional<Organization> findById(TenantId tenantId) {
+      return organizations.values().stream()
+          .filter(o -> o.getId().equals(tenantId))
+          .findFirst();
+    }
+
+    @Override
     public Organization save(Organization organization) {
       if (throwOnSave) {
         throw new RuntimeException("persistence failure");

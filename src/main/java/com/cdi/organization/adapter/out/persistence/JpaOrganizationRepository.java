@@ -1,6 +1,7 @@
 package com.cdi.organization.adapter.out.persistence;
 
 import com.cdi.application.port.out.OrganizationRepository;
+import com.cdi.common.domain.id.TenantId;
 import com.cdi.organization.domain.Organization;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
@@ -32,6 +33,13 @@ public class JpaOrganizationRepository implements OrganizationRepository {
   @Transactional(readOnly = true)
   public Optional<Organization> findByName(String name) {
     return organizationJpaRepository.findByName(name)
+        .map(OrganizationMapper::toDomain);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<Organization> findById(TenantId tenantId) {
+    return organizationJpaRepository.findById(tenantId.value())
         .map(OrganizationMapper::toDomain);
   }
 
