@@ -5,6 +5,7 @@ import com.cdi.common.domain.id.TenantId;
 import com.cdi.policy.domain.Policy;
 import com.cdi.policy.domain.PolicyStatus;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -54,6 +55,21 @@ public interface PolicyRepository {
    *     the tenant has no such policy
    */
   Optional<Policy> findByTenantIdAndId(TenantId tenantId, PolicyId policyId);
+
+  /**
+   * Lists every policy version for a tenant — the UC-18 ListPolicyVersions
+   * history (application-layer.md §6 UC-18, policy-decision-domain.md §3).
+   * Returns all statuses (the ACTIVE version plus ARCHIVED historical
+   * versions, which coexist per tenant — V9), each as a full {@code Policy}
+   * aggregate. Ordered by {@code createdAt} ascending (oldest first) with
+   * {@code id} as the deterministic tie-breaker. The lookup is always
+   * tenant-scoped — cross-tenant rows are never returned.
+   *
+   * @param tenantId the context tenant
+   * @return the tenant's policy versions, oldest first; empty if the tenant
+   *     has no policy rows
+   */
+  List<Policy> findAllByTenantId(TenantId tenantId);
 
   /**
    * Resolves the active policy for a tenant.

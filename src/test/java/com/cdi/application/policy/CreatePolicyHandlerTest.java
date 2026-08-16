@@ -242,6 +242,11 @@ class CreatePolicyHandlerTest {
     }
 
     @Override
+    public java.util.List<Policy> findAllByTenantId(TenantId tenantId) {
+      return java.util.List.of();
+    }
+
+    @Override
     public Policy save(Policy policy) {
       if (throwOnSave) {
         throw new RuntimeException("persistence failure");

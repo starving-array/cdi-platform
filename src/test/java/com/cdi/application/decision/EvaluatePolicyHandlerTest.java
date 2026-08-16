@@ -464,6 +464,11 @@ class EvaluatePolicyHandlerTest {
     }
 
     @Override
+    public java.util.List<Policy> findAllByTenantId(TenantId tenantId) {
+      return java.util.List.of();
+    }
+
+    @Override
     public Policy save(Policy policy) {
       this.policy = policy;
       return policy;

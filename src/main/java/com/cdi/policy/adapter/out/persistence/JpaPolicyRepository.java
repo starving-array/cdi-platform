@@ -8,6 +8,7 @@ import com.cdi.policy.domain.PolicyStatus;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -51,6 +52,16 @@ public class JpaPolicyRepository implements PolicyRepository {
     return policyJpaRepository
         .findByTenantIdAndId(tenantId.value(), policyId.value())
         .map(PolicyMapper::toDomain);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<Policy> findAllByTenantId(TenantId tenantId) {
+    return policyJpaRepository
+        .findByTenantIdOrderByCreatedAtAscIdAsc(tenantId.value())
+        .stream()
+        .map(PolicyMapper::toDomain)
+        .toList();
   }
 
   @Override

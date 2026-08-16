@@ -150,6 +150,17 @@ class GetPolicyQueryServiceTest {
     }
 
     @Override
+    public List<Policy> findAllByTenantId(TenantId tenantId) {
+      return byId.values().stream()
+          .filter(p -> p.getTenantId().equals(tenantId))
+          .sorted((a, b) -> {
+            int byTime = a.getCreatedAt().compareTo(b.getCreatedAt());
+            return byTime != 0 ? byTime : a.getId().value().compareTo(b.getId().value());
+          })
+          .toList();
+    }
+
+    @Override
     public Policy save(Policy policy) {
       byId.put(policy.getId(), policy);
       return policy;

@@ -2,6 +2,7 @@ package com.cdi.policy.adapter.out.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,6 +21,13 @@ public interface PolicyJpaRepository extends JpaRepository<PolicyEntity, UUID> {
   Optional<PolicyEntity> findByTenantIdAndStatus(UUID tenantId, String status);
 
   Optional<PolicyEntity> findByTenantIdAndId(UUID tenantId, UUID id);
+
+  /**
+   * Lists every policy row for a tenant, oldest first by {@code createdAt}
+   * with {@code id} as the deterministic tie-breaker — the UC-18
+   * ListPolicyVersions history (all statuses: ACTIVE + ARCHIVED versions).
+   */
+  List<PolicyEntity> findByTenantIdOrderByCreatedAtAscIdAsc(UUID tenantId);
 
   long countByTenantId(UUID tenantId);
 
