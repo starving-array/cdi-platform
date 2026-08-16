@@ -15,6 +15,7 @@ public enum ApplicationError {
   CHANGE_NOT_FOUND("No change exists for the given identifiers", false),
   ANALYSIS_RUN_NOT_FOUND("No analysis run exists for the given id", false),
   ORGANIZATION_NOT_FOUND("No organization exists for the given tenant", false),
+  REPOSITORY_NOT_FOUND("No repository exists for the given tenant", false),
   ANALYSIS_ALREADY_RUNNING("An analysis for this change is already running", false),
   ANALYSIS_SUPERSEDED("A newer commit has invalidated this analysis", false),
   INSUFFICIENT_CONTEXT("Required architecture metadata is missing", false),

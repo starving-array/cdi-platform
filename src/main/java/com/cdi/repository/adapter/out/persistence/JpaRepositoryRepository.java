@@ -1,6 +1,7 @@
 package com.cdi.repository.adapter.out.persistence;
 
 import com.cdi.application.port.out.RepositoryRepository;
+import com.cdi.common.domain.id.RepositoryId;
 import com.cdi.common.domain.id.TenantId;
 import com.cdi.repository.domain.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,15 @@ public class JpaRepositoryRepository implements RepositoryRepository {
     return repositoryJpaRepository
         .findByTenantIdAndProviderTypeAndExternalId(
             tenantId.value(), providerType.name(), externalId)
+        .map(RepositoryMapper::toDomain);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<Repository> findByTenantIdAndId(
+      TenantId tenantId, RepositoryId repositoryId) {
+    return repositoryJpaRepository
+        .findByTenantIdAndId(tenantId.value(), repositoryId.value())
         .map(RepositoryMapper::toDomain);
   }
 

@@ -19,6 +19,8 @@ public interface RepositoryJpaRepository extends JpaRepository<RepositoryEntity,
   Optional<RepositoryEntity> findByTenantIdAndProviderTypeAndExternalId(
       UUID tenantId, String providerType, String externalId);
 
+  Optional<RepositoryEntity> findByTenantIdAndId(UUID tenantId, UUID id);
+
   long countByTenantId(UUID tenantId);
 
   long countByTenantIdAndProviderTypeAndExternalId(

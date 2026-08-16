@@ -200,6 +200,14 @@ class CreateRepositoryHandlerTest {
     }
 
     @Override
+    public Optional<Repository> findByTenantIdAndId(
+        TenantId tenantId, RepositoryId repositoryId) {
+      return repositories.values().stream()
+          .filter(r -> r.getTenantId().equals(tenantId) && r.getId().equals(repositoryId))
+          .findFirst();
+    }
+
+    @Override
     public Repository save(Repository repository) {
       if (throwOnSave) {
         throw new RuntimeException("persistence failure");
