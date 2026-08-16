@@ -617,6 +617,11 @@ class OrchestrationChainTest {
         List<String> keywords, int limit) {
       return List.of();
     }
+
+    @Override
+    public List<EvidenceRecord> searchByQuery(TenantId tenantId, String query, int limit) {
+      return List.of();
+    }
   }
 
   private static class FakeAgentPort implements AgentPort {

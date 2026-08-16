@@ -77,6 +77,15 @@ class PortContractTest {
   }
 
   @Test
+  void evidenceSearchPortShouldReturnSearchByQueryRecords() {
+    List<EvidenceRecord> records =
+        evidenceSearchPort.searchByQuery(tenantId, "kafka", 5);
+
+    assertEquals(1, records.size());
+    assertEquals("Query result", records.get(0).getTitle());
+  }
+
+  @Test
   void agentPortShouldReturnStructuredFindings() {
     RiskAssessment risk = new RiskAssessment(
         com.cdi.common.domain.id.RiskAssessmentId.generate(),
@@ -165,6 +174,11 @@ class PortContractTest {
     public List<EvidenceRecord> searchIncidents(TenantId tenantId, ServiceId serviceId,
                                                 List<String> keywords, int limit) {
       return List.of(record(tenantId, "Past incident 2"));
+    }
+
+    @Override
+    public List<EvidenceRecord> searchByQuery(TenantId tenantId, String query, int limit) {
+      return List.of(record(tenantId, "Query result"));
     }
 
     private EvidenceRecord record(TenantId tenantId, String title) {

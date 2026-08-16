@@ -101,9 +101,10 @@ com.cdi.application
 │   └── ListPolicyVersionsQueryService.java   # (P1)
 │
 └── evidence
-    └── __no package files in P0__
-        # P0 uses EvidenceSearchPort only.
-        # P1 adds: validateInvestigationFindings(...) helpers invoked by InvestigateRiskHandler.
+    └── SearchEvidenceQueryService.java   # (P2, first P2 capability — ADR-008)
+        # Query service + SearchEvidenceResult view for use-cases.md §6.2.
+        # P0/P1 used EvidenceSearchPort directly; P1 adds:
+        # validateInvestigationFindings(...) helpers invoked by InvestigateRiskHandler.
 ```
 
 **Naming conventions**
@@ -145,7 +146,14 @@ Canonical V1 use cases (commands mutate, queries read). Actors: **SW** = System 
 | UC-17 | ListAnalysisRuns | Query | EN | Sync | **P1** |
 | UC-18 | ListPolicyVersions | Query | TA | Sync | **P1** |
 
-Deferred entirely (Product backlog / P2, not in V1 inventory): SearchEvidence, ListChanges list/feed UI, SuspendOrganization, ArchiveRepository, DeprecateService, outcome/deployment tracking, ML attribution. The `EvidenceRecord` search surface is exposed during P1 via `InvestigateRisk`, not as a public use case yet.
+Post-V1 items. The V1 inventory ends at UC-18. **SearchEvidence is the first P2
+capability** (`use-cases.md` §6.2) and is delivered as a deterministic,
+query-first evidence search (ADR-008) — it is **not** a V1 UC and **not**
+"UC-19". Still deferred entirely (Product backlog / P2): ListChanges list/feed
+UI, SuspendOrganization, ArchiveRepository, DeprecateService, outcome/deployment
+tracking, ML attribution. The internal `EvidenceRecord` search surface was
+already exposed during P1 via `InvestigateRisk`; SearchEvidence now makes it a
+public (ENGINEER-only) query.
 
 ---
 
@@ -166,7 +174,10 @@ Deferred entirely (Product backlog / P2, not in V1 inventory): SearchEvidence, L
 - UC-17 ListAnalysisRuns, UC-18 ListPolicyVersions (list/versioning UI).
 
 ### P2 — explicitly deferred
-- Semantic (pgvector) evidence retrieval, agent-discovered evidence, search UI, outcome attribution, deployment integration, cross-tenant dashboards.
+- **SearchEvidence (query-first, deterministic — delivered first, ADR-008)**: the
+  semantic (pgvector) side stays deferred; the search UI is a separate P2/backlog item.
+- Semantic (pgvector) evidence retrieval, agent-discovered evidence, search UI, outcome
+  attribution, deployment integration, cross-tenant dashboards.
 
 **Rationale for deferring the agent to P1**: ADR-005 makes risk and policy enforcement deterministic; the agent is a conditional enhancement whose own failure mode is graceful degradation to the deterministic path (`ports-and-adapters.md` §4, `analysis-workflow.md` §7). Therefore P0 delivers the full *value* of the system (change in → traceable decision out) with zero LLM cost and no dependency on an external provider. The `AgentPort` interface is still declared in P0 (Section 7) so the shape is fixed, but it has no P0 caller.
 
@@ -296,6 +307,8 @@ Commands and queries are structurally separated. Every command/query defines: in
 
 Rules: queries never call external ports; queries never mutate; query services never open write transactions (open a read-only read or none). Queries are not idempotency-keyed.
 
+**Sanctioned exception (ADR-008)**: the P2 SearchEvidence query (use-cases.md §6.2, the first P2 capability) is the one query that *does* call an external port — `EvidenceSearchPort.searchByQuery(tenantId, query, limit)`. It is synchronous and read-only, and its failure contract degrades to zero evidence (`SearchEvidenceResult.degraded = true`) instead of raising an application error (ports-and-adapters.md §4), so the "never external" rule's safety intent is preserved. All other queries remain external-port-free.
+
 P1 commands (UC-05..UC-10), UC-17/18 queries: same shape; detailed later. OverrideDecision must call `DecisionRecord` builder path and attach `HumanOverride` (the current `DecisionRecord` aggregate is treated as append/create-with-override, never mutated-in-place — see `domain-model.md` §H invariant).
 
 ---
@@ -308,7 +321,7 @@ Interfaces live in `com.cdi.application.common.port`. Conceptual signatures (usi
 |------|---------|-----------|--------------------|---------------------------------------------------|
 | `SourceControlPort` | Fetch PR/diff metadata, publish checks | AnalyzeChange, GenerateDecision | `ChangeMetadata getChangeMetadata(tenantId, repositoryId, providerChangeId)`; `List<FileDiff> getDiff(tenantId, repositoryId, commitSha)`; `void publishStatusCheck(tenantId, repositoryId, commitSha, DecisionOutcome, List<DecisionReason>, String detailsUrl)` | Rate-limit/5xx → exponential backoff (max 3). Failure → analysis FAILED, manual review required |
 | `SystemContextPort` | Service boundaries, criticality | AnalyzeChange | `CriticalityTier getServiceCriticality(tenantId, repositoryId, List<String> filePaths)`; `List<ServiceDependency> getDependencies(tenantId, serviceId)` | Catalog unavailable → short backoff (max 3) → degrade: criticality `UNKNOWN` treated as high-risk |
-| `EvidenceSearchPort` | Historical truth (safe), semantic later | AnalyzeChange | `List<EvidenceRecord> searchSimilarChanges(tenantId, filePaths, limit)`; `List<EvidenceRecord> searchIncidents(tenantId, serviceId, keywords, limit)` | Timeout → no retry → degrade: zero evidence, `EvidenceState` reflects missing; deterministic signals only |
+| `EvidenceSearchPort` | Historical truth (safe), semantic later | AnalyzeChange; **SearchEvidence (P2, ADR-008)** | `List<EvidenceRecord> searchSimilarChanges(tenantId, filePaths, limit)`; `List<EvidenceRecord> searchIncidents(tenantId, serviceId, keywords, limit)`; `List<EvidenceRecord> searchByQuery(tenantId, query, limit)` — deterministic SQL `ILIKE` over title/content (B1), ordered `capturedAt` asc + `EvidenceId` tie-breaker (B3), top-N (D3) | Timeout → no retry → degrade: zero evidence / `degraded=true`, `EvidenceState` reflects missing; deterministic signals only |
 | `AgentPort` | LLM investigation loop | — (declared now, first user UC-05, P1) | `InvestigationFindings investigate(AgentContext, RiskAssessment, List<EvidenceRecord>)` | Timeout/bad schema → 1 retry, 2-min timeout → degrade: investigation FAILED, deterministic risk only |
 | `JobQueuePort` | Enqueue/cancel async commands | ProposeChange, AnalyzeChange, GenerateDecision | `JobId enqueue(String commandName, Object payload, IdempotencyKey key)`; `void cancel(IdempotencyKey key)` | DB down → bubble up → webhook 500 (SCM retries delivery) |
 

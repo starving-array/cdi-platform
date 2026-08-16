@@ -143,6 +143,7 @@ Retrieves the aggregated view of a specific commit analysis.
 }
 ```
 - **Note**: This endpoint aggregates Risk, Investigation, Evidence, and Decision to avoid excessive API fragmentation (N+1 queries for the UI). The schema clearly separates Risk from Decision. Private LLM internals (chains, prompts) are explicitly omitted.
+- **Evidence payload rendering (T1, ADR-008)**: the `summary` field is rendered from the domain `EvidenceRecord.title` (`summary := title`) — backward-compatible with the historical concept of a summary. The searchable body text (`EvidenceRecord.content`) is *not* added to this aggregate payload (no invented fields); a future SearchEvidence endpoint (P2, `use-cases.md` §6.2) returns the same `{evidenceId, sourceType, sourceReference, summary}` shape for each result.
 
 ---
 
@@ -167,7 +168,7 @@ All errors follow a standard JSON structure. HTTP Status codes map broadly to th
 - `FORBIDDEN`: Actor lacks permission for the resource.
 - `RESOURCE_NOT_FOUND`: Change, Analysis, or Repo does not exist.
 - `ANALYSIS_SUPERSEDED`: Attempted action on an obsolete analysis run.
-- `EVIDENCE_UNAVAILABLE`: Graceful degradation indicator (system proceeded, but RAG failed).
+- `EVIDENCE_UNAVAILABLE`: Graceful degradation indicator (system proceeded, but RAG failed). This is also the API-layer rendering for a **degraded SearchEvidence result** (ADR-008 D5: `SearchEvidenceResult.degraded = true`); `EVIDENCE_COLLECTION_FAILED` remains reserved for the async/terminal worker path and is not used for the query.
 - `SYSTEM_FAILURE`: Unrecoverable internal error.
 
 ---

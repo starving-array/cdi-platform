@@ -668,6 +668,11 @@ class AnalyzeChangeHandlerTest {
         TenantId tenantId, ServiceId serviceId, List<String> keywords, int limit) {
       return List.of();
     }
+
+    @Override
+    public List<EvidenceRecord> searchByQuery(TenantId tenantId, String query, int limit) {
+      return List.of();
+    }
   }
 
   private static class FakeJobQueuePort implements JobQueuePort {

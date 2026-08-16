@@ -20,11 +20,13 @@ import com.cdi.systemcontext.domain.CriticalityTier;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class InboundCommandQueryContractTest {
 
@@ -340,6 +342,45 @@ class InboundCommandQueryContractTest {
     // null idempotencyKey
     assertThrows(DomainException.class, () -> new CreatePolicyCommand(
         tenantId, "name", "", PolicyVersion.of("v1"), List.of(rule), actor, null));
+  }
+
+  @Test
+  void shouldConstructSearchEvidenceQuery() {
+    SearchEvidenceQuery query = new SearchEvidenceQuery("kafka", Map.of(), 25);
+
+    assertEquals("kafka", query.query());
+    assertEquals(25, query.limit());
+    assertTrue(query.filters().isEmpty());
+  }
+
+  @Test
+  void shouldDefaultSearchEvidenceQueryLimit() {
+    SearchEvidenceQuery query = new SearchEvidenceQuery("kafka", Map.of());
+
+    assertEquals(SearchEvidenceQuery.DEFAULT_LIMIT, query.limit());
+    assertEquals(20, query.limit());
+  }
+
+  @Test
+  void shouldTrimSearchEvidenceQuery() {
+    SearchEvidenceQuery query = new SearchEvidenceQuery("  kafka   ", Map.of());
+
+    assertEquals("kafka", query.query());
+  }
+
+  @Test
+  void shouldRejectInvalidSearchEvidenceQuery() {
+    // null/blank query
+    assertThrows(DomainException.class, () -> new SearchEvidenceQuery(null, Map.of()));
+    assertThrows(DomainException.class, () -> new SearchEvidenceQuery("   ", Map.of()));
+    // null filters
+    assertThrows(DomainException.class, () -> new SearchEvidenceQuery("kafka", null));
+    // non-empty filters are structurally reserved (D1) and rejected
+    assertThrows(DomainException.class,
+        () -> new SearchEvidenceQuery("kafka", Map.of("source", "INCIDENT")));
+    // limit out of range
+    assertThrows(DomainException.class, () -> new SearchEvidenceQuery("kafka", Map.of(), 0));
+    assertThrows(DomainException.class, () -> new SearchEvidenceQuery("kafka", Map.of(), -5));
   }
 
   @Test

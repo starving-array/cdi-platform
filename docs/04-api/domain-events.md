@@ -48,6 +48,14 @@ We strictly **DO NOT** introduce Kafka or external event brokers. The payload st
 - **Key Payload**:
   - `DecisionId`, `ChangeId`, `CommitSHA`, `Outcome` (APPROVE, REVIEW_REQUIRED, BLOCK), `PolicyVersionId`.
 
+### 4.5 EvidenceIngested — NOT defined yet (deferred)
+`EvidenceIngested` is mentioned only in `bounded-contexts.md` §1 and is deliberately
+**absent** from this canonical catalog. The P2 SearchEvidence delivery (ADR-008) is a
+read-only query over the deterministic `evidence_record` store and publishes no events;
+evidence *ingestion* is explicitly out of scope for it. The event will be defined here
+only when an ingestion use case exists (per the "publish only what has a consumer or a
+stated audit need" rule, application-layer.md §12).
+
 ---
 
 ## 5. Rejected Events

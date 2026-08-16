@@ -29,8 +29,8 @@ This document maps the domain model to a PostgreSQL relational database design. 
 
 ### C. Evidence & Vector Storage
 *Immutable historical truth.*
-- `evidence_record`: `id`, `tenant_id`, `source_type` (e.g. INCIDENT, PR), `source_uri`, `summary`, `content_hash`, `timestamp`.
-- `evidence_embedding`: Stores the `pgvector` embeddings separately. `id`, `tenant_id`, `evidence_record_id`, `chunk_index`, `embedding` (vector), `model_version`.
+- `evidence_record`: **implemented (V10, ADR-008 T1)** as the deterministic search store: `id`, `tenant_id`, `analysis_run_id`, `source_type` (e.g. INCIDENT, PR), `source_uri`, `origin`, `title`, `content`, `content_hash`, `captured_at`, `source_timestamp`, `relevance_score`, `relevance_reason`. The searchable text is `title` (NOT NULL) + `content` (NULLable); `content_hash` is the SHA-256 hex digest. Tenant-scoped FK to `analysis_run (tenant_id, id)` and `UNIQUE (tenant_id, id)`. (Conceptually `summary` == rendered `title` — api-contract.md §3.4.)
+- `evidence_embedding`: **deferred with semantic search (ADR-008 B1)** — not created in V10. Stores the `pgvector` embeddings separately. `id`, `tenant_id`, `evidence_record_id`, `chunk_index`, `embedding` (vector), `model_version`. Storing embeddings separately lets us re-embed evidence with a newer model without destroying the original text records.
   - **Rationale**: Storing embeddings in a separate table allows us to re-embed the same evidence with a newer model (e.g., migrating from OpenAI `text-embedding-3-small` to `text-embedding-3-large`) without destroying the original text records.
 
 ### D. Risk & Investigation
@@ -141,9 +141,14 @@ erDiagram
     EVIDENCE_RECORD {
         uuid id PK
         uuid tenant_id FK
+        uuid analysis_run_id FK
         string source_type
         string source_uri
+        string origin
+        string title
+        text content
         string content_hash
+        timestamp captured_at
     }
     EVIDENCE_EMBEDDING {
         uuid id PK
