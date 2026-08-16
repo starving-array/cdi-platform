@@ -118,6 +118,36 @@ class InboundCommandQueryContractTest {
   }
 
   @Test
+  void shouldConstructGetChangeBySourceQuery() {
+    TenantId tenantId = TenantId.generate();
+    RepositoryId repositoryId = RepositoryId.generate();
+    GetChangeBySourceQuery query =
+        new GetChangeBySourceQuery(tenantId, repositoryId, "PR-42");
+
+    assertEquals(tenantId, query.tenantId());
+    assertEquals(repositoryId, query.repositoryId());
+    assertEquals("PR-42", query.providerChangeId());
+  }
+
+  @Test
+  void shouldTrimProviderChangeIdInGetChangeBySourceQuery() {
+    GetChangeBySourceQuery query = new GetChangeBySourceQuery(
+        TenantId.generate(), RepositoryId.generate(), "  PR-42  ");
+
+    assertEquals("PR-42", query.providerChangeId());
+  }
+
+  @Test
+  void shouldRejectInvalidGetChangeBySourceQuery() {
+    assertThrows(DomainException.class, () -> new GetChangeBySourceQuery(
+        null, RepositoryId.generate(), "PR-42"));
+    assertThrows(DomainException.class, () -> new GetChangeBySourceQuery(
+        TenantId.generate(), null, "PR-42"));
+    assertThrows(DomainException.class, () -> new GetChangeBySourceQuery(
+        TenantId.generate(), RepositoryId.generate(), "   "));
+  }
+
+  @Test
   void shouldConstructCreateOrganizationCommand() {
     CreateOrganizationCommand command = new CreateOrganizationCommand(
         "Acme Corp", actor, key);

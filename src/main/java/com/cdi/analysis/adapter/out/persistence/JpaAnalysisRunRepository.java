@@ -10,6 +10,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -51,6 +52,17 @@ public class JpaAnalysisRunRepository implements AnalysisRunRepository {
     return analysisRunJpaRepository.findById(analysisRunId.value())
         .map(entity -> new AnalysisRunContext(
             new TenantId(entity.getTenantId()), AnalysisRunMapper.toDomain(entity)));
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<AnalysisRunContext> findByTenantAndChange(TenantId tenantId, ChangeId changeId) {
+    return analysisRunJpaRepository
+        .findByTenantIdAndChangeIdOrderByCreatedAtAscIdAsc(
+            tenantId.value(), changeId.value())
+        .stream()
+        .map(entity -> new AnalysisRunContext(tenantId, AnalysisRunMapper.toDomain(entity)))
+        .toList();
   }
 
   @Override

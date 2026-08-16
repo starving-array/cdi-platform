@@ -5,6 +5,7 @@ import com.cdi.common.domain.id.AnalysisRunId;
 import com.cdi.common.domain.id.ChangeId;
 import com.cdi.common.domain.id.TenantId;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -41,6 +42,17 @@ public interface AnalysisRunRepository {
    *     if the run is not {@code QUEUED} (someone else owns it / replay-safe)
    */
   boolean claim(AnalysisRunId analysisRunId);
+
+  /**
+   * Lists every analysis run for a change, scoped by tenant — the UC-11
+   * GetChange run history (application-layer.md §6 UC-11, use-cases.md §6.1).
+   * Ordered by {@code createdAt} ascending (oldest first) with {@code id} as
+   * the deterministic tie-breaker.
+   *
+   * @return the change's runs, oldest first; empty if the change has no runs
+   *     yet
+   */
+  List<AnalysisRunContext> findByTenantAndChange(TenantId tenantId, ChangeId changeId);
 
   AnalysisRun save(TenantId tenantId, AnalysisRun run);
 }

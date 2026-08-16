@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,6 +25,13 @@ public interface AnalysisRunJpaRepository extends JpaRepository<AnalysisRunEntit
       UUID tenantId, UUID changeId, String commitSha);
 
   long countByTenantIdAndChangeId(UUID tenantId, UUID changeId);
+
+  /**
+   * Run history for a change (UC-11 GetChange), oldest first with the id as a
+   * deterministic tie-breaker (application-layer.md §6 UC-11).
+   */
+  List<AnalysisRunEntity> findByTenantIdAndChangeIdOrderByCreatedAtAscIdAsc(
+      UUID tenantId, UUID changeId);
 
   @Modifying
   @Query("UPDATE AnalysisRunEntity r SET r.status = 'RUNNING' "

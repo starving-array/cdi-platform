@@ -466,6 +466,12 @@ class OrchestrationChainTest {
       byId.put(run.getId().value(), run);
       return run;
     }
+
+    @Override
+    public List<AnalysisRunContext> findByTenantAndChange(
+        TenantId tenantId, ChangeId changeId) {
+      return List.of();
+    }
   }
 
   private static class FakeRiskAssessmentRepository implements RiskAssessmentRepository {
