@@ -213,6 +213,14 @@ class CreateServiceHandlerTest {
     }
 
     @Override
+    public Optional<Service> findByTenantIdAndId(
+        TenantId tenantId, ServiceId serviceId) {
+      return services.values().stream()
+          .filter(s -> s.getTenantId().equals(tenantId) && s.getId().equals(serviceId))
+          .findFirst();
+    }
+
+    @Override
     public Service save(Service service) {
       if (throwOnSave) {
         throw new RuntimeException("persistence failure");
