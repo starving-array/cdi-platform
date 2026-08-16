@@ -105,6 +105,7 @@ class InboundCommandQueryContractTest {
     assertEquals(repositoryId, new GetRepositoryQuery(repositoryId).repositoryId());
     assertEquals(serviceId, new GetServiceQuery(serviceId).serviceId());
     assertEquals(policyId, new GetPolicyQuery(policyId).policyId());
+    assertEquals(changeId, new ListAnalysisRunsQuery(changeId).changeId());
   }
 
   @Test
@@ -115,6 +116,7 @@ class InboundCommandQueryContractTest {
     assertThrows(DomainException.class, () -> new GetRepositoryQuery(null));
     assertThrows(DomainException.class, () -> new GetServiceQuery(null));
     assertThrows(DomainException.class, () -> new GetPolicyQuery(null));
+    assertThrows(DomainException.class, () -> new ListAnalysisRunsQuery(null));
   }
 
   @Test
