@@ -33,6 +33,6 @@ class ApplicationErrorTest {
 
   @Test
   void shouldCoverTheDocumentedCanonicalCatalog() {
-    assertEquals(8, ApplicationError.values().length);
+    assertEquals(9, ApplicationError.values().length);
   }
 }
