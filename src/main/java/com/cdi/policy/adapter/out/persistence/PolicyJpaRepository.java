@@ -19,6 +19,8 @@ public interface PolicyJpaRepository extends JpaRepository<PolicyEntity, UUID> {
 
   Optional<PolicyEntity> findByTenantIdAndStatus(UUID tenantId, String status);
 
+  Optional<PolicyEntity> findByTenantIdAndId(UUID tenantId, UUID id);
+
   long countByTenantId(UUID tenantId);
 
   long countByTenantIdAndStatus(UUID tenantId, String status);

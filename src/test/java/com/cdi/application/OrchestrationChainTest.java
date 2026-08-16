@@ -39,6 +39,7 @@ import com.cdi.common.domain.event.DomainEvent;
 import com.cdi.common.domain.id.AnalysisRunId;
 import com.cdi.common.domain.id.ChangeId;
 import com.cdi.common.domain.id.InvestigationId;
+import com.cdi.common.domain.id.PolicyId;
 import com.cdi.common.domain.id.RepositoryId;
 import com.cdi.common.domain.id.RiskAssessmentId;
 import com.cdi.common.domain.id.TenantId;
@@ -497,6 +498,14 @@ class OrchestrationChainTest {
     @Override
     public Optional<Policy> findActiveByTenant(TenantId tenantId) {
       return Optional.ofNullable(policy);
+    }
+
+    @Override
+    public Optional<Policy> findByTenantIdAndId(TenantId tenantId, PolicyId policyId) {
+      if (policy != null && policy.getId().equals(policyId)) {
+        return Optional.of(policy);
+      }
+      return Optional.empty();
     }
 
     @Override

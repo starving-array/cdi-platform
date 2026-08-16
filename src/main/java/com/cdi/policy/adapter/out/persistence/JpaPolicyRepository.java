@@ -1,6 +1,7 @@
 package com.cdi.policy.adapter.out.persistence;
 
 import com.cdi.application.port.out.PolicyRepository;
+import com.cdi.common.domain.id.PolicyId;
 import com.cdi.common.domain.id.TenantId;
 import com.cdi.policy.domain.Policy;
 import com.cdi.policy.domain.PolicyStatus;
@@ -11,7 +12,8 @@ import java.util.Optional;
 
 /**
  * JPA/PostgreSQL adapter for the {@code PolicyRepository} port (UC-05 read,
- * UC-10 write; policy + policy_rule tables, data-model.md §E, V9 migration).
+ * UC-10 write; UC-16 tenant-scoped primary lookup; policy + policy_rule
+ * tables, data-model.md §E, V9 migration).
  *
  * <p>Persistence-side only: no domain rules here. The tenant-scoped
  * active-policy lookup that drives UC-05 evaluation and UC-10 idempotent reuse
@@ -40,6 +42,14 @@ public class JpaPolicyRepository implements PolicyRepository {
   public Optional<Policy> findActiveByTenant(TenantId tenantId) {
     return policyJpaRepository
         .findByTenantIdAndStatus(tenantId.value(), PolicyStatus.ACTIVE.name())
+        .map(PolicyMapper::toDomain);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<Policy> findByTenantIdAndId(TenantId tenantId, PolicyId policyId) {
+    return policyJpaRepository
+        .findByTenantIdAndId(tenantId.value(), policyId.value())
         .map(PolicyMapper::toDomain);
   }
 

@@ -235,6 +235,13 @@ class CreatePolicyHandlerTest {
     }
 
     @Override
+    public Optional<Policy> findByTenantIdAndId(TenantId tenantId, PolicyId policyId) {
+      return activeByTenant.values().stream()
+          .filter(p -> p.getTenantId().equals(tenantId) && p.getId().equals(policyId))
+          .findFirst();
+    }
+
+    @Override
     public Policy save(Policy policy) {
       if (throwOnSave) {
         throw new RuntimeException("persistence failure");

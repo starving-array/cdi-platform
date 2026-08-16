@@ -1,5 +1,6 @@
 package com.cdi.application.port.out;
 
+import com.cdi.common.domain.id.PolicyId;
 import com.cdi.common.domain.id.TenantId;
 import com.cdi.policy.domain.Policy;
 import com.cdi.policy.domain.PolicyStatus;
@@ -33,9 +34,26 @@ import java.util.Optional;
  * {@code DataIntegrityViolationException} that propagates verbatim (never
  * converted into a fake successful creation — UC-10 contract, UC-08/UC-09
  * precedent). The pre-existing {@link #findActiveByTenant} read method is
- * unchanged; UC-10 adds only {@link #save}.
+ * unchanged; UC-10 adds only {@link #save}. UC-16 GetPolicy adds the
+ * tenant-scoped primary lookup {@link #findByTenantIdAndId} (additive, matches
+ * the UC-13/UC-14/UC-15 query precedent).
  */
 public interface PolicyRepository {
+
+  /**
+   * Resolves the policy for a tenant by primary identifier (UC-16 GetPolicy,
+   * application-layer.md §6). The lookup is always tenant-scoped — a policy
+   * from tenant A is never visible to tenant B (data-model.md §2/§5); a policy
+   * that does not belong to the context tenant resolves to empty, never a
+   * cross-tenant read. The query services use only this scoped lookup and never
+   * an unscoped id lookup.
+   *
+   * @param tenantId the context tenant
+   * @param policyId the policy identifier
+   * @return the matching {@code Policy} aggregate (parent + rules), or empty if
+   *     the tenant has no such policy
+   */
+  Optional<Policy> findByTenantIdAndId(TenantId tenantId, PolicyId policyId);
 
   /**
    * Resolves the active policy for a tenant.

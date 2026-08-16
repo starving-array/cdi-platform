@@ -450,6 +450,20 @@ class EvaluatePolicyHandlerTest {
     }
 
     @Override
+    public Optional<Policy> findByTenantIdAndId(TenantId tenantId, PolicyId policyId) {
+      if (fail) {
+        throw new PortException(PortType.SYSTEM_CONTEXT, false, "policy repo down");
+      }
+      if (!tenantId.value().equals(defaultTenant.value())) {
+        return Optional.empty();
+      }
+      if (policy != null && policy.getId().equals(policyId)) {
+        return Optional.of(policy);
+      }
+      return Optional.empty();
+    }
+
+    @Override
     public Policy save(Policy policy) {
       this.policy = policy;
       return policy;
