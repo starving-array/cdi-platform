@@ -24,6 +24,8 @@ public enum ApplicationError {
   EVIDENCE_COLLECTION_FAILED("Evidence collection failed", false),
   AGENT_INVESTIGATION_FAILED("AI investigation failed", true),
   POLICY_EVALUATION_FAILED("Policy evaluation failed", false),
+  DECISION_NOT_FOUND("No decision exists for the given analysis run", false),
+  DECISION_ALREADY_OVERRIDDEN("The decision is already overridden", false),
   UNAUTHORIZED("Actor lacks the required role", false);
 
   private final String defaultMessage;

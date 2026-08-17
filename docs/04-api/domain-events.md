@@ -56,6 +56,22 @@ evidence *ingestion* is explicitly out of scope for it. The event will be define
 only when an ingestion use case exists (per the "publish only what has a consumer or a
 stated audit need" rule, application-layer.md §12).
 
+### 4.6 DecisionOverridden
+- **Purpose**: Signals that a `TENANT_ADMIN` has recorded the single, immutable
+  human override of a decision's outcome (UC-06 OverrideDecision, ADR-006). Used
+  for audit logging of who changed what outcome and why.
+- **Producer**: `OverrideDecision` Use Case.
+- **Consumer**: Audit Logger.
+- **Key Payload**:
+  - `AnalysisRunId`, `ChangeId`, `DecisionId`, `OriginalOutcome`, `Outcome`
+    (the post-override effective outcome, `APPROVE`/`REVIEW_REQUIRED`/`BLOCK`),
+    `CommitSHA`, plus the standard envelope fields. The actor and justification
+    live on the persisted `human_override` row (data-model.md §E), not on the
+    event.
+- **Standards**: published in the same transaction as the saved override
+  (application-layer.md §8) through `DomainEventPublisher`; the original
+  `decision_record` row is never modified by this event's producer.
+
 ---
 
 ## 5. Rejected Events

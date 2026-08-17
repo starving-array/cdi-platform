@@ -33,11 +33,13 @@ class ApplicationErrorTest {
     assertFalse(ApplicationError.INSUFFICIENT_CONTEXT.retryable());
     assertFalse(ApplicationError.EVIDENCE_COLLECTION_FAILED.retryable());
     assertFalse(ApplicationError.POLICY_EVALUATION_FAILED.retryable());
+    assertFalse(ApplicationError.DECISION_NOT_FOUND.retryable());
+    assertFalse(ApplicationError.DECISION_ALREADY_OVERRIDDEN.retryable());
     assertFalse(ApplicationError.UNAUTHORIZED.retryable());
   }
 
   @Test
   void shouldCoverTheDocumentedCanonicalCatalog() {
-    assertEquals(13, ApplicationError.values().length);
+    assertEquals(15, ApplicationError.values().length);
   }
 }

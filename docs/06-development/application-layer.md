@@ -294,6 +294,15 @@ Commands and queries are structurally separated. Every command/query defines: in
 - Output: `IdempotentCommandResult(analysisRunId, created)` (`created=false` on any idempotent reuse).
 - **Separation of concerns**: idempotency (this UC, application layer) ≠ concurrency (worker CAS claim, §11) ≠ final safety net (DB `UNIQUE (tenant_id, change_id, commit_sha)`, `data-model.md` §5). All three are required and independent.
 
+**UC-06 OverrideDecisionCommand** — sync (P1, ADR-006)
+- Input: `tenantId, actor, analysisRunId, decisionId, newOutcome, justification` (all required; actor must be `TENANT_ADMIN` — `UNAUTHORIZED` otherwise)
+- Logic: resolve the tenant-scoped run (`ANALYSIS_RUN_NOT_FOUND` for missing/cross-tenant; `ANALYSIS_SUPERSEDED` for a superseded run); resolve the decision for that run/tenant and verify it matches `decisionId` (`DECISION_NOT_FOUND`); reject already-overridden (`DECISION_ALREADY_OVERRIDDEN`). Apply `HumanOverride(actor.id, decision.originalOutcome, newOutcome, justification, clock.instant())` via the immutable `DecisionRecord.withOverride(...)` — never mutates the original row — and persist; publish `DecisionOverridden` (outbox).
+- Ports: `AnalysisRunRepository`, `DecisionRecordRepository`, `DomainEventPublisher` (all internal / same-DB)
+- Tx: one short tx (persist aggregate incl. 1:1 `human_override` child + outbox event)
+- Output: `OverrideDecisionResult(decisionId, originalOutcome, outcome)`
+- **Non-idempotent (frozen D3/§10)**: carries **no** `IdempotencyKey` and is never replayed; a repeat resolves to `DECISION_ALREADY_OVERRIDDEN`. One shot only.
+- Failure: the two decision-specific additions `DECISION_NOT_FOUND` / `DECISION_ALREADY_OVERRIDDEN` are **non-retryable** (§9.1); concurrency race on the one-override invariant is the DB `UNIQUE (tenant_id, decision_record_id)` backstop (V11).
+
 ### Queries (P0)
 
 | Query | Input | Output view | Notes |
@@ -371,6 +380,8 @@ The Application layer raises **exactly one** `ApplicationException(ApplicationEr
 | `EVIDENCE_COLLECTION_FAILED` | RAG/search/vector failure that cannot degrade | no | 503/502 |
 | `AGENT_INVESTIGATION_FAILED` | LLM timeout/structural validation failed (P1) | 1 retry | 502 |
 | `POLICY_EVALUATION_FAILED` | Policy syntax/variables error | no | 422 |
+| `DECISION_NOT_FOUND` | No decision exists for the given tenant/run, or the supplied decision id does not match (UC-06 OverrideDecision) | no | 404 |
+| `DECISION_ALREADY_OVERRIDDEN` | The decision already has its one override (UC-06) — repeat is rejected, never replayed | no | 409 |
 | `UNAUTHORIZED` | Actor lacks required role | no | 403 |
 
 ### 9.2 Internal worker classification
@@ -400,6 +411,7 @@ Workers translate **port exceptions → stage outcome** (never leak raw adapter 
 | UC-01 ProposeChange | Compute `IdempotencyKey(tenantId, repositoryId, providerChangeId, commitSha)`. On duplicate (same PR + same commit already present) return the **existing** `analysisRunId` with `created=false` (no new run). HTTP `Idempotency-Key` header from `api-contract.md` is the transport expression; the application key is the semantic one. |
 | UC-03/UC-04 (workers) | Queue guarantees at-least-once. Handlers are **replay-safe**: run claim via CAS `QUEUED→RUNNING` (UC-03) and decision generation guarded by "no decision for run yet" check. Double execution is a no-op. |
 | UC-02 RequestAnalysis | **Idempotent** (corrected). Key `IdempotencyKey.analyze(tenantId, changeId, commitSha)` — see Section 6 UC-02. Always resolves by `(tenant, change, commit)` (`data-model.md` §5 uniqueness) and never duplicates a run; crosses all five run states; FAILED retry collapses concurrent requests to one job via `analysis_job.UNIQUE(tenant_id, idempotency_key)`. Concurrency protection (worker CAS) is separate and additive, not a substitute. |
+| UC-06 OverrideDecision | **Non-idempotent** (frozen D3, ADR-006). Carries **no** `IdempotencyKey` — an override is a distinct, auditable human action and is never safe to replay. A second invocation for the same decision resolves to `DECISION_ALREADY_OVERRIDDEN`. The one-override invariant's race-safe backstop is `human_override.UNIQUE (tenant_id, decision_record_id)` (V11). |
 
 Rules: queries are never keyed; idempotency keys are persisted (same row/tx as the aggregate write) so duplicate detection is race-safe; a rejected duplicate never cascades to enqueue a second job.
 
@@ -426,6 +438,7 @@ Three writers can touch the same `AnalysisRun`/job: the **intake** (new commit s
 - `ChangeProposed` (Carrier: `tenantId, repositoryId, providerChangeId, commitSha, analysisRunId`)
 - `RiskAssessed` (`analysisRunId, changeId, riskAssessmentId, riskLevel`) — per `domain-events.md` §4.2 (`RiskAssessmentId, ChangeId, RiskScore`)
 - `DecisionGenerated` (`analysisRunId, changeId, decisionId, outcome, policyVersion, commitSha`) — per `domain-events.md` §4.4 (`DecisionId, ChangeId, CommitSHA, Outcome, PolicyVersionId`)
+- `DecisionOverridden` (`analysisRunId, changeId, decisionId, originalOutcome, outcome, commitSha`; occurredOn = `override_at`) — per `domain-events.md` §4.6; published by UC-06 OverrideDecision in the same transaction as the override row (ADR-006)
 - `AnalysisCompleted` / `AnalysisFailed` — supplementary run-lifecycle events for audit only (`domain-events.md` §5 rejected the *too-granular* per-sub-step `ChangeAnalysisStarted`/`EvidenceCollected`; these terminal lifecycle events are coarser and kept out of the reject list)
 - `AnalysisStarted` (optional observability aid — not part of the canonical set; add only when a consumer exists)
 

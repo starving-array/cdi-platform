@@ -9,6 +9,7 @@ import com.cdi.common.domain.id.TenantId;
 import com.cdi.decision.domain.DecisionOutcome;
 import com.cdi.decision.domain.DecisionReason;
 import com.cdi.decision.domain.DecisionRecord;
+import com.cdi.decision.domain.HumanOverride;
 import com.cdi.decision.domain.RequiredAction;
 
 import java.util.ArrayList;
@@ -58,6 +59,22 @@ final class DecisionRecordMapper {
       reasons.add(reasonEntity);
     }
     entity.setReasons(reasons);
+
+    if (record.getOverride().isPresent()) {
+      HumanOverride override = record.getOverride().get();
+      HumanOverrideEntity overrideEntity = new HumanOverrideEntity();
+      overrideEntity.setId(UUID.randomUUID());
+      overrideEntity.setTenantId(tenantId.value());
+      overrideEntity.setDecisionRecord(entity);
+      overrideEntity.setOriginalOutcome(override.originalOutcome().name());
+      overrideEntity.setNewOutcome(override.newOutcome().name());
+      overrideEntity.setActorId(override.actorId());
+      overrideEntity.setJustification(override.justification());
+      overrideEntity.setOverrideAt(override.timestamp());
+      overrideEntity.setCreatedAt(override.timestamp());
+      overrideEntity.setUpdatedAt(override.timestamp());
+      entity.setOverride(overrideEntity);
+    }
     return entity;
   }
 
@@ -69,7 +86,7 @@ final class DecisionRecordMapper {
           reasonEntity.getRuleId(),
           split(reasonEntity.getEvidenceReferenceIds())));
     }
-    return DecisionRecord.builder()
+    DecisionRecord.Builder builder = DecisionRecord.builder()
         .id(new DecisionId(entity.getId()))
         .tenantId(new TenantId(entity.getTenantId()))
         .analysisRunId(new AnalysisRunId(entity.getAnalysisRunId()))
@@ -79,8 +96,17 @@ final class DecisionRecordMapper {
         .outcome(DecisionOutcome.valueOf(entity.getOutcome()))
         .reasons(reasons)
         .requiredActions(splitActions(entity.getRequiredActions()))
-        .generatedAt(entity.getGeneratedAt())
-        .build();
+        .generatedAt(entity.getGeneratedAt());
+    if (entity.getOverride() != null) {
+      HumanOverrideEntity overrideEntity = entity.getOverride();
+      builder.override(new HumanOverride(
+          overrideEntity.getActorId(),
+          DecisionOutcome.valueOf(overrideEntity.getOriginalOutcome()),
+          DecisionOutcome.valueOf(overrideEntity.getNewOutcome()),
+          overrideEntity.getJustification(),
+          overrideEntity.getOverrideAt()));
+    }
+    return builder.build();
   }
 
   private static String joinActions(List<RequiredAction> actions) {

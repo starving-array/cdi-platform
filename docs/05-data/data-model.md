@@ -44,8 +44,8 @@ This document maps the domain model to a PostgreSQL relational database design. 
 *Subjective enforcement.*
 - `policy`: `id`, `tenant_id`, `version`, `status` (ACTIVE/ARCHIVED).
 - `policy_rule`: `id`, `tenant_id`, `policy_id`, `condition`, `outcome`.
-- `decision_record`: `id`, `tenant_id`, `analysis_run_id`, `policy_id`, `risk_assessment_id`, `outcome` (APPROVE/BLOCK), `reason`.
-- `human_override`: `id`, `tenant_id`, `decision_record_id`, `actor_id`, `justification`.
+- `decision_record`: `id`, `tenant_id`, `analysis_run_id`, `policy_id`, `risk_assessment_id`, `outcome` (APPROVE/BLOCK/REVIEW_REQUIRED), `required_actions` (CSV), `generated_at` (**immutable**; the aggregate has no setters).
+- `human_override`: **implemented (V11, UC-06 OverrideDecision, ADR-006)** as a 1:1 child of `decision_record`: `id`, `tenant_id`, `decision_record_id`, `original_outcome`, `new_outcome`, `actor_id`, `justification` (required — never silent), `override_at` (supplements — never replaces — `generated_at`), `created_at`, `updated_at`. `UNIQUE (tenant_id, decision_record_id)` guarantees exactly one override per decision; the historical `decision_record` row is never modified by an override.
 
 ### F. Asynchronous Job State
 - `analysis_job`: `id`, `tenant_id`, `idempotency_key`, `status` (PENDING, RUNNING, COMPLETED, FAILED), `retry_count`, `locked_at`.
@@ -127,11 +127,22 @@ erDiagram
         uuid policy_id FK
         string outcome
     }
+    HUMAN_OVERRIDE {
+        uuid id PK
+        uuid tenant_id FK
+        uuid decision_record_id FK
+        string original_outcome
+        string new_outcome
+        string actor_id
+        string justification
+        timestamp override_at
+    }
     
     TENANT ||--o{ CHANGE : "owns"
     CHANGE ||--o{ ANALYSIS_RUN : "has"
     ANALYSIS_RUN ||--o| RISK_ASSESSMENT : "generates"
     ANALYSIS_RUN ||--o| DECISION_RECORD : "resolves in"
+    DECISION_RECORD ||--o| HUMAN_OVERRIDE : "overridden by (0..1)"
 ```
 
 ### Evidence & Vector Diagram

@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
@@ -23,6 +24,11 @@ import java.util.UUID;
  * column (never-query-by-column child payload, data-model.md §7).
  * {@code UNIQUE (tenant_id, analysis_run_id)} guarantees one decision per
  * analysis run (application-layer.md §10).
+ *
+ * <p>An aggregate may carry an optional {@link HumanOverrideEntity} (1:1,
+ * {@code human_override} table, data-model.md §E/§11, ADR-006). The override
+ * is supplemental: it records the one immutable human change of the decision's
+ * outcome (UC-06) without ever modifying this parent's own outcome columns.
  */
 @Entity
 @Table(name = "decision_record")
@@ -50,6 +56,10 @@ public class DecisionRecordEntity {
   @OneToMany(mappedBy = "decisionRecord", cascade = CascadeType.ALL,
       orphanRemoval = true, fetch = FetchType.EAGER)
   private List<DecisionReasonEntity> reasons = new ArrayList<>();
+
+  @OneToOne(mappedBy = "decisionRecord", cascade = CascadeType.ALL,
+      orphanRemoval = true, fetch = FetchType.EAGER)
+  private HumanOverrideEntity override;
 
   public UUID getId() { return id; }
 
@@ -90,4 +100,8 @@ public class DecisionRecordEntity {
   public List<DecisionReasonEntity> getReasons() { return reasons; }
 
   public void setReasons(List<DecisionReasonEntity> reasons) { this.reasons = reasons; }
+
+  public HumanOverrideEntity getOverride() { return override; }
+
+  public void setOverride(HumanOverrideEntity override) { this.override = override; }
 }

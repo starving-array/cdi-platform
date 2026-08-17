@@ -5,6 +5,7 @@ import com.cdi.application.common.IdempotencyKey;
 import com.cdi.common.domain.exception.DomainException;
 import com.cdi.common.domain.id.AnalysisRunId;
 import com.cdi.common.domain.id.ChangeId;
+import com.cdi.common.domain.id.DecisionId;
 import com.cdi.common.domain.id.PolicyId;
 import com.cdi.common.domain.id.RepositoryId;
 import com.cdi.common.domain.id.ServiceId;
@@ -406,5 +407,57 @@ class InboundCommandQueryContractTest {
     assertEquals(DecisionOutcome.REVIEW_REQUIRED, stored.outcome());
     assertEquals(List.of(RequiredAction.HUMAN_REVIEW, RequiredAction.SECURITY_REVIEW), stored.actions());
     assertEquals("Requires human review", stored.explanation());
+  }
+
+  @Test
+  void shouldConstructOverrideDecisionCommand() {
+    TenantId tenantId = TenantId.generate();
+    Actor admin = new Actor("admin-1", Actor.Role.TENANT_ADMIN);
+    AnalysisRunId runId = AnalysisRunId.generate();
+    DecisionId decisionId = DecisionId.generate();
+    OverrideDecisionCommand command = new OverrideDecisionCommand(
+        tenantId, admin, runId, decisionId, DecisionOutcome.BLOCK, "Security incident");
+
+    assertEquals(tenantId, command.tenantId());
+    assertEquals(admin, command.actor());
+    assertEquals(runId, command.analysisRunId());
+    assertEquals(decisionId, command.decisionId());
+    assertEquals(DecisionOutcome.BLOCK, command.newOutcome());
+    assertEquals("Security incident", command.justification());
+  }
+
+  @Test
+  void shouldTrimJustificationInOverrideDecisionCommand() {
+    OverrideDecisionCommand command = new OverrideDecisionCommand(
+        TenantId.generate(), new Actor("admin-1", Actor.Role.TENANT_ADMIN),
+        AnalysisRunId.generate(), DecisionId.generate(),
+        DecisionOutcome.BLOCK, "  justified override  ");
+
+    assertEquals("justified override", command.justification());
+  }
+
+  @Test
+  void shouldRejectInvalidOverrideDecisionCommand() {
+    Actor admin = new Actor("admin-1", Actor.Role.TENANT_ADMIN);
+    AnalysisRunId runId = AnalysisRunId.generate();
+    DecisionId decisionId = DecisionId.generate();
+    // null tenantId
+    assertThrows(DomainException.class, () -> new OverrideDecisionCommand(
+        null, admin, runId, decisionId, DecisionOutcome.BLOCK, "why"));
+    // null actor
+    assertThrows(DomainException.class, () -> new OverrideDecisionCommand(
+        TenantId.generate(), null, runId, decisionId, DecisionOutcome.BLOCK, "why"));
+    // null analysisRunId
+    assertThrows(DomainException.class, () -> new OverrideDecisionCommand(
+        TenantId.generate(), admin, null, decisionId, DecisionOutcome.BLOCK, "why"));
+    // null decisionId
+    assertThrows(DomainException.class, () -> new OverrideDecisionCommand(
+        TenantId.generate(), admin, runId, null, DecisionOutcome.BLOCK, "why"));
+    // null outcome
+    assertThrows(DomainException.class, () -> new OverrideDecisionCommand(
+        TenantId.generate(), admin, runId, decisionId, null, "why"));
+    // blank justification (override must never be silent)
+    assertThrows(DomainException.class, () -> new OverrideDecisionCommand(
+        TenantId.generate(), admin, runId, decisionId, DecisionOutcome.BLOCK, "   "));
   }
 }
