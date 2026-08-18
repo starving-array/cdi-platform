@@ -15,6 +15,7 @@ public enum ApplicationError {
   CHANGE_NOT_FOUND("No change exists for the given identifiers", false),
   ANALYSIS_RUN_NOT_FOUND("No analysis run exists for the given id", false),
   ORGANIZATION_NOT_FOUND("No organization exists for the given tenant", false),
+  ORGANIZATION_ALREADY_SUSPENDED("The organization is already suspended", false),
   REPOSITORY_NOT_FOUND("No repository exists for the given tenant", false),
   SERVICE_NOT_FOUND("No service exists for the given tenant", false),
   POLICY_NOT_FOUND("No policy exists for the given tenant", false),

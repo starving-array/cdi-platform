@@ -460,4 +460,24 @@ class InboundCommandQueryContractTest {
     assertThrows(DomainException.class, () -> new OverrideDecisionCommand(
         TenantId.generate(), admin, runId, decisionId, DecisionOutcome.BLOCK, "   "));
   }
+
+  @Test
+  void shouldConstructSuspendOrganizationCommand() {
+    TenantId tenantId = TenantId.generate();
+    Actor admin = new Actor("admin-1", Actor.Role.TENANT_ADMIN);
+    SuspendOrganizationCommand command = new SuspendOrganizationCommand(tenantId, admin);
+
+    assertEquals(tenantId, command.tenantId());
+    assertEquals(admin, command.actor());
+  }
+
+  @Test
+  void shouldRejectInvalidSuspendOrganizationCommand() {
+    Actor admin = new Actor("admin-1", Actor.Role.TENANT_ADMIN);
+    // null tenantId
+    assertThrows(DomainException.class, () -> new SuspendOrganizationCommand(null, admin));
+    // null actor
+    assertThrows(DomainException.class,
+        () -> new SuspendOrganizationCommand(TenantId.generate(), null));
+  }
 }

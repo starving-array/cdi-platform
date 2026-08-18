@@ -25,6 +25,7 @@ class ApplicationErrorTest {
     assertFalse(ApplicationError.CHANGE_NOT_FOUND.retryable());
     assertFalse(ApplicationError.ANALYSIS_RUN_NOT_FOUND.retryable());
     assertFalse(ApplicationError.ORGANIZATION_NOT_FOUND.retryable());
+    assertFalse(ApplicationError.ORGANIZATION_ALREADY_SUSPENDED.retryable());
     assertFalse(ApplicationError.REPOSITORY_NOT_FOUND.retryable());
     assertFalse(ApplicationError.SERVICE_NOT_FOUND.retryable());
     assertFalse(ApplicationError.POLICY_NOT_FOUND.retryable());
@@ -40,6 +41,6 @@ class ApplicationErrorTest {
 
   @Test
   void shouldCoverTheDocumentedCanonicalCatalog() {
-    assertEquals(15, ApplicationError.values().length);
+    assertEquals(16, ApplicationError.values().length);
   }
 }

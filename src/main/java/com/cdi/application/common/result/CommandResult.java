@@ -5,8 +5,11 @@ package com.cdi.application.common.result;
  *
  * <p>Represents <em>success</em> only; application <em>failures</em> are
  * modelled as {@link com.cdi.application.common.error.ApplicationException}.
- * Known implementations: {@link IdempotentCommandResult}. Not coupled to
- * HTTP responses.
+ * Known implementations: {@link IdempotentCommandResult},
+ * {@link CreateOrganizationResult}, {@link CreateRepositoryResult},
+ * {@link CreateServiceResult}, {@link CreatePolicyResult},
+ * {@link OverrideDecisionResult}, {@link SuspendOrganizationResult}. Not
+ * coupled to HTTP responses.
  */
 public interface CommandResult {
 }

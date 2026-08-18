@@ -303,6 +303,15 @@ Commands and queries are structurally separated. Every command/query defines: in
 - **Non-idempotent (frozen D3/§10)**: carries **no** `IdempotencyKey` and is never replayed; a repeat resolves to `DECISION_ALREADY_OVERRIDDEN`. One shot only.
 - Failure: the two decision-specific additions `DECISION_NOT_FOUND` / `DECISION_ALREADY_OVERRIDDEN` are **non-retryable** (§9.1); concurrency race on the one-override invariant is the DB `UNIQUE (tenant_id, decision_record_id)` backstop (V11).
 
+**P2 SuspendOrganizationCommand** — sync (first P2 admin write after the deferred backlog)
+- Input: `tenantId, actor` (all required; actor must be `TENANT_ADMIN` — `UNAUTHORIZED` otherwise; the organization id **is** the tenant root, so a single `tenantId` is the complete scope — no separate `organizationId`)
+- Logic: resolve the tenant-root organization via `OrganizationRepository.findById(tenantId)` (`ORGANIZATION_NOT_FOUND` for missing/cross-tenant); apply the domain transition `Organization.suspend()` (ACTIVE→SUSPENDED); a `DomainException` for an already-suspended organization maps to `ORGANIZATION_ALREADY_SUSPENDED` (non-retryable, §9.1); persist via the existing `save()` path
+- Ports: `OrganizationRepository` (internal / same-DB only)
+- Tx: one short tx (`save()`)
+- Output: `SuspendOrganizationResult(tenantId, status)` (`status` = resulting `SUSPENDED`)
+- **Non-idempotent (D4/§10)**: carries **no** `IdempotencyKey` and is never replayed; a repeat resolves to `ORGANIZATION_ALREADY_SUSPENDED`. One shot only.
+- **Semantics (D5/D6)**: publishes **no** domain event (no authoritative consumer/audit need — §12) and adds **no** `updated_at`/timestamp behavior; the domain `Organization` aggregate and all migrations are untouched.
+
 ### Queries (P0)
 
 | Query | Input | Output view | Notes |
@@ -382,6 +391,7 @@ The Application layer raises **exactly one** `ApplicationException(ApplicationEr
 | `POLICY_EVALUATION_FAILED` | Policy syntax/variables error | no | 422 |
 | `DECISION_NOT_FOUND` | No decision exists for the given tenant/run, or the supplied decision id does not match (UC-06 OverrideDecision) | no | 404 |
 | `DECISION_ALREADY_OVERRIDDEN` | The decision already has its one override (UC-06) — repeat is rejected, never replayed | no | 409 |
+| `ORGANIZATION_ALREADY_SUSPENDED` | The organization (tenant) is already suspended (P2 SuspendOrganization) — repeat is rejected, never replayed | no | 409 |
 | `UNAUTHORIZED` | Actor lacks required role | no | 403 |
 
 ### 9.2 Internal worker classification
@@ -412,6 +422,7 @@ Workers translate **port exceptions → stage outcome** (never leak raw adapter 
 | UC-03/UC-04 (workers) | Queue guarantees at-least-once. Handlers are **replay-safe**: run claim via CAS `QUEUED→RUNNING` (UC-03) and decision generation guarded by "no decision for run yet" check. Double execution is a no-op. |
 | UC-02 RequestAnalysis | **Idempotent** (corrected). Key `IdempotencyKey.analyze(tenantId, changeId, commitSha)` — see Section 6 UC-02. Always resolves by `(tenant, change, commit)` (`data-model.md` §5 uniqueness) and never duplicates a run; crosses all five run states; FAILED retry collapses concurrent requests to one job via `analysis_job.UNIQUE(tenant_id, idempotency_key)`. Concurrency protection (worker CAS) is separate and additive, not a substitute. |
 | UC-06 OverrideDecision | **Non-idempotent** (frozen D3, ADR-006). Carries **no** `IdempotencyKey` — an override is a distinct, auditable human action and is never safe to replay. A second invocation for the same decision resolves to `DECISION_ALREADY_OVERRIDDEN`. The one-override invariant's race-safe backstop is `human_override.UNIQUE (tenant_id, decision_record_id)` (V11). |
+| P2 SuspendOrganization | **Non-idempotent** (D4). Carries **no** `IdempotencyKey` — a suspension is a distinct admin state change and is never safe to replay. A second invocation for the same organization resolves to `ORGANIZATION_ALREADY_SUSPENDED`. Repeat is rejected by the domain guard `Organization.suspend()` (already-SUSPENDED throws `DomainException`); no DB uniqueness net is needed since the transition is a status update on the single tenant-root row. |
 
 Rules: queries are never keyed; idempotency keys are persisted (same row/tx as the aggregate write) so duplicate detection is race-safe; a rejected duplicate never cascades to enqueue a second job.
 
