@@ -480,4 +480,33 @@ class InboundCommandQueryContractTest {
     assertThrows(DomainException.class,
         () -> new SuspendOrganizationCommand(TenantId.generate(), null));
   }
+
+  @Test
+  void shouldConstructArchiveRepositoryCommand() {
+    TenantId tenantId = TenantId.generate();
+    RepositoryId repositoryId = RepositoryId.generate();
+    Actor admin = new Actor("admin-1", Actor.Role.TENANT_ADMIN);
+    ArchiveRepositoryCommand command = new ArchiveRepositoryCommand(tenantId, repositoryId, admin);
+
+    assertEquals(tenantId, command.tenantId());
+    assertEquals(repositoryId, command.repositoryId());
+    assertEquals(admin, command.actor());
+  }
+
+  @Test
+  void shouldRejectInvalidArchiveRepositoryCommand() {
+    TenantId tenantId = TenantId.generate();
+    RepositoryId repositoryId = RepositoryId.generate();
+    Actor admin = new Actor("admin-1", Actor.Role.TENANT_ADMIN);
+
+    // null tenantId
+    assertThrows(DomainException.class,
+        () -> new ArchiveRepositoryCommand(null, repositoryId, admin));
+    // null repositoryId
+    assertThrows(DomainException.class,
+        () -> new ArchiveRepositoryCommand(tenantId, null, admin));
+    // null actor
+    assertThrows(DomainException.class,
+        () -> new ArchiveRepositoryCommand(tenantId, repositoryId, null));
+  }
 }

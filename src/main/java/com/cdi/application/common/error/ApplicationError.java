@@ -17,6 +17,7 @@ public enum ApplicationError {
   ORGANIZATION_NOT_FOUND("No organization exists for the given tenant", false),
   ORGANIZATION_ALREADY_SUSPENDED("The organization is already suspended", false),
   REPOSITORY_NOT_FOUND("No repository exists for the given tenant", false),
+  REPOSITORY_ALREADY_ARCHIVED("The repository is already archived", false),
   SERVICE_NOT_FOUND("No service exists for the given tenant", false),
   POLICY_NOT_FOUND("No policy exists for the given tenant", false),
   ANALYSIS_ALREADY_RUNNING("An analysis for this change is already running", false),
