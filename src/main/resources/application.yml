@@ -24,3 +24,11 @@ management:
   endpoint:
     health:
       show-details: always
+
+cdi:
+  embedding:
+    provider: onnx
+    model-path: classpath:models/all-MiniLM-L6-v2/model.onnx
+    model-version: all-MiniLM-L6-v2-onnx-v1
+  evidence:
+    similarity-threshold: 0.65

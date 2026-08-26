@@ -44,4 +44,50 @@ public class WebAdapterApplicationConfiguration {
       EvidenceSearchPort evidenceSearchPort) {
     return new SearchEvidenceQueryService(evidenceSearchPort);
   }
+
+  @Bean
+  public com.cdi.application.deployment.RecordDeploymentHandler recordDeploymentHandler(
+      com.cdi.application.port.out.DeploymentRepository deploymentRepository,
+      com.cdi.application.port.out.ServiceRepository serviceRepository) {
+    return new com.cdi.application.deployment.RecordDeploymentHandler(deploymentRepository, serviceRepository);
+  }
+
+  @Bean
+  public com.cdi.application.deployment.RecordDeploymentOutcomeHandler recordDeploymentOutcomeHandler(
+      com.cdi.application.port.out.DeploymentRepository deploymentRepository) {
+    return new com.cdi.application.deployment.RecordDeploymentOutcomeHandler(deploymentRepository);
+  }
+
+  @Bean
+  public com.cdi.application.deployment.GetDeploymentQueryService getDeploymentQueryService(
+      com.cdi.application.port.out.DeploymentRepository deploymentRepository) {
+    return new com.cdi.application.deployment.GetDeploymentQueryService(deploymentRepository);
+  }
+
+  @Bean
+  public com.cdi.application.deployment.ListDeploymentsQueryService listDeploymentsQueryService(
+      com.cdi.application.port.out.DeploymentRepository deploymentRepository) {
+    return new com.cdi.application.deployment.ListDeploymentsQueryService(deploymentRepository);
+  }
+
+  @Bean
+  public com.cdi.application.attribution.GetDeploymentAttributionQueryService getDeploymentAttributionQueryService(
+      com.cdi.application.port.out.DecisionAttributionRepository decisionAttributionRepository,
+      com.cdi.application.port.out.DeploymentRepository deploymentRepository,
+      com.cdi.application.port.out.AnalysisRunRepository analysisRunRepository,
+      com.cdi.application.port.out.RiskAssessmentRepository riskAssessmentRepository,
+      com.cdi.application.port.out.DecisionRecordRepository decisionRecordRepository) {
+    return new com.cdi.application.attribution.GetDeploymentAttributionQueryService(
+        decisionAttributionRepository,
+        deploymentRepository,
+        analysisRunRepository,
+        riskAssessmentRepository,
+        decisionRecordRepository);
+  }
+
+  @Bean
+  public com.cdi.application.attribution.GetAttributionSummaryQueryService getAttributionSummaryQueryService(
+      com.cdi.application.port.out.DecisionAttributionRepository decisionAttributionRepository) {
+    return new com.cdi.application.attribution.GetAttributionSummaryQueryService(decisionAttributionRepository);
+  }
 }

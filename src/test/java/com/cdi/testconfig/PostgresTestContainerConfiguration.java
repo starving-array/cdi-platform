@@ -8,9 +8,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 /**
  * Shared Testcontainers infrastructure for integration tests.
  *
- * <p>Exposes a single {@code postgres:15-alpine} container as a Spring bean so that
- * both {@code CdiApplicationTests} and {@code HealthControllerTest} reuse the same
- * PostgreSQL configuration without duplicating container declarations.
+ * <p>Exposes a single {@code pgvector/pgvector:pg16} container as a Spring bean so that
+ * all integration tests reuse the same PostgreSQL + pgvector configuration without duplicating
+ * container declarations.
  *
  * <p>Via {@link ServiceConnection}, Spring Boot supplies the DataSource from this
  * container, which then drives the Flyway and JPA initialization. The container is
@@ -22,6 +22,6 @@ public class PostgresTestContainerConfiguration {
     @Bean
     @ServiceConnection
     PostgreSQLContainer<?> postgresContainer() {
-        return new PostgreSQLContainer<>("postgres:15-alpine");
+        return new PostgreSQLContainer<>("pgvector/pgvector:pg16");
     }
 }

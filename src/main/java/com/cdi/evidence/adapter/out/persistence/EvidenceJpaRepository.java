@@ -39,4 +39,22 @@ public interface EvidenceJpaRepository extends JpaRepository<EvidenceEntity, UUI
       @Param("tenantId") UUID tenantId,
       @Param("pattern") String pattern,
       @Param("limit") int limit);
+
+  /**
+   * Semantic vector search using pgvector cosine distance (<=>) and HNSW index.
+   * Strictly tenant-isolated at the SQL query level (D4, Non-negotiable Tenant Isolation).
+   * Filters by configurable cosine distance threshold (:threshold).
+   */
+  @Query(value = "SELECT r.* FROM evidence_record r "
+      + "JOIN evidence_embedding e ON e.tenant_id = r.tenant_id AND e.evidence_record_id = r.id "
+      + "WHERE r.tenant_id = :tenantId "
+      + "AND (e.embedding <=> cast(:vector as vector)) < :threshold "
+      + "ORDER BY (e.embedding <=> cast(:vector as vector)) ASC, r.captured_at ASC, r.id ASC "
+      + "LIMIT :limit",
+      nativeQuery = true)
+  List<EvidenceEntity> searchByVector(
+      @Param("tenantId") UUID tenantId,
+      @Param("vector") String vector,
+      @Param("threshold") double threshold,
+      @Param("limit") int limit);
 }

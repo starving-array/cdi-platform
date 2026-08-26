@@ -38,11 +38,14 @@ class ApplicationErrorTest {
     assertFalse(ApplicationError.POLICY_EVALUATION_FAILED.retryable());
     assertFalse(ApplicationError.DECISION_NOT_FOUND.retryable());
     assertFalse(ApplicationError.DECISION_ALREADY_OVERRIDDEN.retryable());
+    assertFalse(ApplicationError.DEPLOYMENT_NOT_FOUND.retryable());
+    assertFalse(ApplicationError.OUTCOME_ALREADY_RECORDED.retryable());
+    assertFalse(ApplicationError.ATTRIBUTION_NOT_FOUND.retryable());
     assertFalse(ApplicationError.UNAUTHORIZED.retryable());
   }
 
   @Test
   void shouldCoverTheDocumentedCanonicalCatalog() {
-    assertEquals(18, ApplicationError.values().length);
+    assertEquals(21, ApplicationError.values().length);
   }
 }

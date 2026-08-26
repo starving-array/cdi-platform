@@ -54,5 +54,9 @@ public interface AnalysisRunRepository {
    */
   List<AnalysisRunContext> findByTenantAndChange(TenantId tenantId, ChangeId changeId);
 
+  default List<AnalysisRunContext> findByTenantAndCommit(TenantId tenantId, String commitSha) {
+    return List.of();
+  }
+
   AnalysisRun save(TenantId tenantId, AnalysisRun run);
 }

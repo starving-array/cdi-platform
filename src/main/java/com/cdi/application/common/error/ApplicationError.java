@@ -29,6 +29,9 @@ public enum ApplicationError {
   POLICY_EVALUATION_FAILED("Policy evaluation failed", false),
   DECISION_NOT_FOUND("No decision exists for the given analysis run", false),
   DECISION_ALREADY_OVERRIDDEN("The decision is already overridden", false),
+  DEPLOYMENT_NOT_FOUND("No deployment exists for the given id", false),
+  OUTCOME_ALREADY_RECORDED("The deployment already has a recorded outcome", false),
+  ATTRIBUTION_NOT_FOUND("No attribution exists for the given deployment", false),
   UNAUTHORIZED("Actor lacks the required role", false);
 
   private final String defaultMessage;

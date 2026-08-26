@@ -66,6 +66,17 @@ public class JpaAnalysisRunRepository implements AnalysisRunRepository {
   }
 
   @Override
+  @Transactional(readOnly = true)
+  public List<AnalysisRunContext> findByTenantAndCommit(TenantId tenantId, String commitSha) {
+    return analysisRunJpaRepository
+        .findByTenantIdAndCommitShaOrderByCreatedAtDesc(
+            tenantId.value(), commitSha)
+        .stream()
+        .map(entity -> new AnalysisRunContext(tenantId, AnalysisRunMapper.toDomain(entity)))
+        .toList();
+  }
+
+  @Override
   @Transactional
   public boolean claim(AnalysisRunId analysisRunId) {
     return analysisRunJpaRepository.claimQueuedToRunning(analysisRunId.value()) > 0;

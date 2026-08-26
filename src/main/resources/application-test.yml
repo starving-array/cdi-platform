@@ -6,3 +6,9 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
+cdi:
+  embedding:
+    provider: deterministic
+  evidence:
+    similarity-threshold: 0.85

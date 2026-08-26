@@ -33,6 +33,9 @@ public interface AnalysisRunJpaRepository extends JpaRepository<AnalysisRunEntit
   List<AnalysisRunEntity> findByTenantIdAndChangeIdOrderByCreatedAtAscIdAsc(
       UUID tenantId, UUID changeId);
 
+  List<AnalysisRunEntity> findByTenantIdAndCommitShaOrderByCreatedAtDesc(
+      UUID tenantId, String commitSha);
+
   @Modifying
   @Query("UPDATE AnalysisRunEntity r SET r.status = 'RUNNING' "
       + "WHERE r.id = :id AND r.status = 'QUEUED'")
