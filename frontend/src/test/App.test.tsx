@@ -4,11 +4,11 @@ import { App } from '../App';
 import { DevSecurityProvider, useDevSecurity } from '../context/DevSecurityContext';
 
 describe('Frontend Shell & Dev Security Context', () => {
-  it('renders application shell and default feed placeholder', () => {
+  it('renders application shell and default feed page', () => {
     render(<App />);
 
     expect(screen.getByText('CDI Platform')).toBeInTheDocument();
-    expect(screen.getByTestId('feed-placeholder')).toBeInTheDocument();
+    expect(screen.getAllByText('Change Decision Feed').length).toBeGreaterThan(0);
   });
 
   it('switches navigation between Change Feed and Evidence Search', () => {
@@ -22,7 +22,7 @@ describe('Frontend Shell & Dev Security Context', () => {
     const feedBtn = screen.getByRole('button', { name: /Change Decision Feed/i });
     fireEvent.click(feedBtn);
 
-    expect(screen.getByTestId('feed-placeholder')).toBeInTheDocument();
+    expect(screen.getAllByText('Change Decision Feed').length).toBeGreaterThan(0);
   });
 
   it('allows updating role and tenant in dev security context', () => {

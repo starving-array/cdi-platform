@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DevSecurityProvider } from './context/DevSecurityContext';
 import { AppHeader } from './components/AppHeader';
+import { ChangesFeedPage } from './pages/ChangesFeedPage';
 import { GitPullRequest, Search } from 'lucide-react';
 
 export const AppContent: React.FC = () => {
@@ -39,16 +40,9 @@ export const AppContent: React.FC = () => {
         </aside>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-8">
+        <main className="flex-1 p-8 overflow-x-hidden">
           {activeTab === 'changes' ? (
-            <div className="max-w-4xl" data-testid="feed-placeholder">
-              <div className="border border-slate-800 bg-slate-900/40 rounded-xl p-6">
-                <h2 className="text-lg font-semibold text-slate-100 mb-2">Change Decision Feed</h2>
-                <p className="text-sm text-slate-400">
-                  Ready for Change Decision Feed implementation. API client and security context initialized.
-                </p>
-              </div>
-            </div>
+            <ChangesFeedPage />
           ) : (
             <div className="max-w-4xl" data-testid="search-placeholder">
               <div className="border border-slate-800 bg-slate-900/40 rounded-xl p-6">
