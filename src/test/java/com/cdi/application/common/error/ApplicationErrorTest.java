@@ -29,6 +29,7 @@ class ApplicationErrorTest {
     assertFalse(ApplicationError.REPOSITORY_NOT_FOUND.retryable());
     assertFalse(ApplicationError.REPOSITORY_ALREADY_ARCHIVED.retryable());
     assertFalse(ApplicationError.SERVICE_NOT_FOUND.retryable());
+    assertFalse(ApplicationError.SERVICE_ALREADY_DEPRECATED.retryable());
     assertFalse(ApplicationError.POLICY_NOT_FOUND.retryable());
     assertFalse(ApplicationError.ANALYSIS_ALREADY_RUNNING.retryable());
     assertFalse(ApplicationError.ANALYSIS_SUPERSEDED.retryable());
@@ -42,6 +43,6 @@ class ApplicationErrorTest {
 
   @Test
   void shouldCoverTheDocumentedCanonicalCatalog() {
-    assertEquals(17, ApplicationError.values().length);
+    assertEquals(18, ApplicationError.values().length);
   }
 }

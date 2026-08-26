@@ -321,6 +321,15 @@ Commands and queries are structurally separated. Every command/query defines: in
 - **Non-idempotent (§10)**: carries **no** `IdempotencyKey` and is never replayed; a repeat resolves to `REPOSITORY_ALREADY_ARCHIVED`. One shot only.
 - **Semantics**: publishes **no** domain event (no authoritative consumer/audit need — §12) and makes no external SCM calls; the domain `Repository` aggregate and all migrations are untouched.
 
+**P2 DeprecateServiceCommand** — sync (P2 admin write)
+- Input: `tenantId, serviceId, actor` (all required; actor must be `TENANT_ADMIN` — `UNAUTHORIZED` otherwise; the service is a tenant-scoped child aggregate, so the command carries both `tenantId` and `serviceId`)
+- Logic: resolve the tenant-scoped service via `ServiceRepository.findByTenantIdAndId(tenantId, serviceId)` (`SERVICE_NOT_FOUND` for missing/cross-tenant); apply the domain transition `Service.deprecate()` (ACTIVE→DEPRECATED); a `DomainException` for an already-deprecated service maps to `SERVICE_ALREADY_DEPRECATED` (non-retryable, §9.1); persist via the existing `save()` path
+- Ports: `ServiceRepository` (internal / same-DB only)
+- Tx: one short tx (`save()`)
+- Output: `DeprecateServiceResult(serviceId, status)` (`status` = resulting `DEPRECATED`)
+- **Non-idempotent (§10)**: carries **no** `IdempotencyKey` and is never replayed; a repeat resolves to `SERVICE_ALREADY_DEPRECATED`. One shot only.
+- **Semantics**: publishes **no** domain event (no authoritative consumer/audit need — §12) and makes no external service calls; the domain `Service` aggregate and all migrations are untouched.
+
 ### Queries (P0)
 
 | Query | Input | Output view | Notes |
@@ -402,6 +411,7 @@ The Application layer raises **exactly one** `ApplicationException(ApplicationEr
 | `DECISION_ALREADY_OVERRIDDEN` | The decision already has its one override (UC-06) — repeat is rejected, never replayed | no | 409 |
 | `ORGANIZATION_ALREADY_SUSPENDED` | The organization (tenant) is already suspended (P2 SuspendOrganization) — repeat is rejected, never replayed | no | 409 |
 | `REPOSITORY_ALREADY_ARCHIVED` | The repository is already archived (P2 ArchiveRepository) — repeat is rejected, never replayed | no | 409 |
+| `SERVICE_ALREADY_DEPRECATED` | The service is already deprecated (P2 DeprecateService) — repeat is rejected, never replayed | no | 409 |
 | `UNAUTHORIZED` | Actor lacks required role | no | 403 |
 
 ### 9.2 Internal worker classification
@@ -434,6 +444,7 @@ Workers translate **port exceptions → stage outcome** (never leak raw adapter 
 | UC-06 OverrideDecision | **Non-idempotent** (frozen D3, ADR-006). Carries **no** `IdempotencyKey` — an override is a distinct, auditable human action and is never safe to replay. A second invocation for the same decision resolves to `DECISION_ALREADY_OVERRIDDEN`. The one-override invariant's race-safe backstop is `human_override.UNIQUE (tenant_id, decision_record_id)` (V11). |
 | P2 SuspendOrganization | **Non-idempotent** (D4). Carries **no** `IdempotencyKey` — a suspension is a distinct admin state change and is never safe to replay. A second invocation for the same organization resolves to `ORGANIZATION_ALREADY_SUSPENDED`. Repeat is rejected by the domain guard `Organization.suspend()` (already-SUSPENDED throws `DomainException`); no DB uniqueness net is needed since the transition is a status update on the single tenant-root row. |
 | P2 ArchiveRepository | **Non-idempotent**. Carries **no** `IdempotencyKey` — an archive is a distinct admin state change and is never safe to replay. A second invocation for the same repository resolves to `REPOSITORY_ALREADY_ARCHIVED`. Repeat is rejected by the domain guard `Repository.archive()` (already-ARCHIVED throws `DomainException`); no DB uniqueness net is needed since the transition is a status update on the repository row. |
+| P2 DeprecateService | **Non-idempotent**. Carries **no** `IdempotencyKey` — a deprecation is a distinct admin state change and is never safe to replay. A second invocation for the same service resolves to `SERVICE_ALREADY_DEPRECATED`. Repeat is rejected by the domain guard `Service.deprecate()` (already-DEPRECATED throws `DomainException`); no DB uniqueness net is needed since the transition is a status update on the service row. |
 
 Rules: queries are never keyed; idempotency keys are persisted (same row/tx as the aggregate write) so duplicate detection is race-safe; a rejected duplicate never cascades to enqueue a second job.
 

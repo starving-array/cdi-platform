@@ -9,7 +9,7 @@ package com.cdi.application.common.result;
  * {@link CreateOrganizationResult}, {@link CreateRepositoryResult},
  * {@link CreateServiceResult}, {@link CreatePolicyResult},
  * {@link OverrideDecisionResult}, {@link SuspendOrganizationResult},
- * {@link ArchiveRepositoryResult}. Not
+ * {@link ArchiveRepositoryResult}, {@link DeprecateServiceResult}. Not
  * coupled to HTTP responses.
  */
 public interface CommandResult {

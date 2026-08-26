@@ -509,4 +509,33 @@ class InboundCommandQueryContractTest {
     assertThrows(DomainException.class,
         () -> new ArchiveRepositoryCommand(tenantId, repositoryId, null));
   }
+
+  @Test
+  void shouldConstructDeprecateServiceCommand() {
+    TenantId tenantId = TenantId.generate();
+    ServiceId serviceId = ServiceId.generate();
+    Actor admin = new Actor("admin-1", Actor.Role.TENANT_ADMIN);
+    DeprecateServiceCommand command = new DeprecateServiceCommand(tenantId, serviceId, admin);
+
+    assertEquals(tenantId, command.tenantId());
+    assertEquals(serviceId, command.serviceId());
+    assertEquals(admin, command.actor());
+  }
+
+  @Test
+  void shouldRejectInvalidDeprecateServiceCommand() {
+    TenantId tenantId = TenantId.generate();
+    ServiceId serviceId = ServiceId.generate();
+    Actor admin = new Actor("admin-1", Actor.Role.TENANT_ADMIN);
+
+    // null tenantId
+    assertThrows(DomainException.class,
+        () -> new DeprecateServiceCommand(null, serviceId, admin));
+    // null serviceId
+    assertThrows(DomainException.class,
+        () -> new DeprecateServiceCommand(tenantId, null, admin));
+    // null actor
+    assertThrows(DomainException.class,
+        () -> new DeprecateServiceCommand(tenantId, serviceId, null));
+  }
 }

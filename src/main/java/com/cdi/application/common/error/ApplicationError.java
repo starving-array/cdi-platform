@@ -19,6 +19,7 @@ public enum ApplicationError {
   REPOSITORY_NOT_FOUND("No repository exists for the given tenant", false),
   REPOSITORY_ALREADY_ARCHIVED("The repository is already archived", false),
   SERVICE_NOT_FOUND("No service exists for the given tenant", false),
+  SERVICE_ALREADY_DEPRECATED("The service is already deprecated", false),
   POLICY_NOT_FOUND("No policy exists for the given tenant", false),
   ANALYSIS_ALREADY_RUNNING("An analysis for this change is already running", false),
   ANALYSIS_SUPERSEDED("A newer commit has invalidated this analysis", false),
