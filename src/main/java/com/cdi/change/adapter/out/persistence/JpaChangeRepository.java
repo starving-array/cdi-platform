@@ -9,6 +9,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -47,6 +48,28 @@ public class JpaChangeRepository implements ChangeRepository {
     return changeJpaRepository
         .findByTenantIdAndId(tenantId.value(), changeId.value())
         .map(ChangeMapper::toDomain);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<Change> findAllByTenantId(TenantId tenantId) {
+    return changeJpaRepository
+        .findByTenantIdOrderByCreatedAtDescIdDesc(tenantId.value())
+        .stream()
+        .map(ChangeMapper::toDomain)
+        .toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public List<Change> findAllByTenantIdAndRepositoryId(
+      TenantId tenantId, RepositoryId repositoryId) {
+    return changeJpaRepository
+        .findByTenantIdAndRepositoryIdOrderByCreatedAtDescIdDesc(
+            tenantId.value(), repositoryId.value())
+        .stream()
+        .map(ChangeMapper::toDomain)
+        .toList();
   }
 
   @Override

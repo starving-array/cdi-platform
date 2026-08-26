@@ -19,5 +19,10 @@ public interface ChangeJpaRepository extends JpaRepository<ChangeEntity, UUID> {
 
   Optional<ChangeEntity> findByTenantIdAndId(UUID tenantId, UUID id);
 
+  java.util.List<ChangeEntity> findByTenantIdOrderByCreatedAtDescIdDesc(UUID tenantId);
+
+  java.util.List<ChangeEntity> findByTenantIdAndRepositoryIdOrderByCreatedAtDescIdDesc(
+      UUID tenantId, UUID repositoryId);
+
   long countByTenantId(UUID tenantId);
 }

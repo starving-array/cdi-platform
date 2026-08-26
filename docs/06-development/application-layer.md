@@ -340,6 +340,7 @@ Commands and queries are structurally separated. Every command/query defines: in
 | UC-14 GetRepository | `repositoryId` | `Repository` | |
 | UC-15 GetService | `serviceId` | `Service` | |
 | UC-16 GetPolicy | `policyId` | `Policy` | Active version is the policy's own version |
+| P2 ListChanges | `Optional<RepositoryId> repositoryId` | `List<Change>` | Tenant-scoped change list, ordered `createdAt DESC, id DESC` at DB level (D1-D10) |
 
 Rules: queries never call external ports; queries never mutate; query services never open write transactions (open a read-only read or none). Queries are not idempotency-keyed.
 
