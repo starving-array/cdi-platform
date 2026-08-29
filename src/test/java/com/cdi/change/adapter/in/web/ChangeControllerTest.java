@@ -4,11 +4,14 @@ import com.cdi.analysis.domain.AnalysisRun;
 import com.cdi.application.change.ChangeAnalysisView;
 import com.cdi.application.change.GetChangeQueryService;
 import com.cdi.application.change.ListChangesQueryService;
+import com.cdi.application.change.ProposeChangeHandler;
 import com.cdi.application.common.error.ApplicationError;
 import com.cdi.application.common.error.ApplicationException;
+import com.cdi.application.common.result.IdempotentCommandResult;
 import com.cdi.change.domain.Change;
 import com.cdi.common.adapter.in.web.DevCorsConfiguration;
 import com.cdi.common.adapter.in.web.RestApiExceptionHandler;
+import com.cdi.common.domain.id.AnalysisRunId;
 import com.cdi.common.domain.id.ChangeId;
 import com.cdi.common.domain.id.RepositoryId;
 import com.cdi.decision.domain.DecisionOutcome;
@@ -19,9 +22,11 @@ import com.cdi.risk.domain.RiskLevel;
 import com.cdi.risk.domain.RiskScore;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -33,11 +38,13 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ChangeController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @Import({RestApiExceptionHandler.class, DevCorsConfiguration.class})
 class ChangeControllerTest {
 
@@ -51,6 +58,9 @@ class ChangeControllerTest {
 
   @MockBean
   private GetChangeQueryService getChangeQueryService;
+
+  @MockBean
+  private ProposeChangeHandler proposeChangeHandler;
 
   @Test
   void engineerCanListChangesSuccessfully() throws Exception {
@@ -179,5 +189,129 @@ class ChangeControllerTest {
             .header("Access-Control-Request-Method", "GET"))
         .andExpect(status().isOk())
         .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
+  }
+
+  @Test
+  void engineerProposeChangeReturns201Created() throws Exception {
+    UUID tenantId = UUID.randomUUID();
+    UUID repoId = UUID.randomUUID();
+    AnalysisRunId runId = AnalysisRunId.generate();
+
+    when(proposeChangeHandler.handle(any()))
+        .thenReturn(new IdempotentCommandResult(runId, true));
+
+    mockMvc.perform(post("/api/v1/changes/propose")
+            .header("X-Tenant-Id", tenantId.toString())
+            .header("X-Actor-Id", "alice")
+            .header("X-Actor-Role", "ENGINEER")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "repositoryId": "%s",
+                  "providerChangeId": "PR-100",
+                  "commitSha": "abc123sha",
+                  "branch": "feature/auth",
+                  "title": "Add auth",
+                  "description": "Desc",
+                  "author": "alice"
+                }
+                """.formatted(repoId)))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.analysisRunId").value(runId.value().toString()))
+        .andExpect(jsonPath("$.created").value(true));
+  }
+
+  @Test
+  void duplicateProposeChangeReturns200Ok() throws Exception {
+    UUID tenantId = UUID.randomUUID();
+    UUID repoId = UUID.randomUUID();
+    AnalysisRunId runId = AnalysisRunId.generate();
+
+    when(proposeChangeHandler.handle(any()))
+        .thenReturn(new IdempotentCommandResult(runId, false));
+
+    mockMvc.perform(post("/api/v1/changes/propose")
+            .header("X-Tenant-Id", tenantId.toString())
+            .header("X-Actor-Id", "alice")
+            .header("X-Actor-Role", "ENGINEER")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "repositoryId": "%s",
+                  "providerChangeId": "PR-100",
+                  "commitSha": "abc123sha"
+                }
+                """.formatted(repoId)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.analysisRunId").value(runId.value().toString()))
+        .andExpect(jsonPath("$.created").value(false));
+  }
+
+  @Test
+  void systemWorkerCanProposeChangeReturns201Created() throws Exception {
+    UUID tenantId = UUID.randomUUID();
+    UUID repoId = UUID.randomUUID();
+    AnalysisRunId runId = AnalysisRunId.generate();
+
+    when(proposeChangeHandler.handle(any()))
+        .thenReturn(new IdempotentCommandResult(runId, true));
+
+    mockMvc.perform(post("/api/v1/changes/propose")
+            .header("X-Tenant-Id", tenantId.toString())
+            .header("X-Actor-Id", "ci-worker")
+            .header("X-Actor-Role", "SYSTEM_WORKER")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "repositoryId": "%s",
+                  "providerChangeId": "PR-100",
+                  "commitSha": "abc123sha"
+                }
+                """.formatted(repoId)))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.analysisRunId").value(runId.value().toString()))
+        .andExpect(jsonPath("$.created").value(true));
+  }
+
+  @Test
+  void tenantAdminProposeChangeReturns403Forbidden() throws Exception {
+    UUID tenantId = UUID.randomUUID();
+    UUID repoId = UUID.randomUUID();
+
+    when(proposeChangeHandler.handle(any()))
+        .thenThrow(new ApplicationException(ApplicationError.UNAUTHORIZED));
+
+    mockMvc.perform(post("/api/v1/changes/propose")
+            .header("X-Tenant-Id", tenantId.toString())
+            .header("X-Actor-Id", "admin")
+            .header("X-Actor-Role", "TENANT_ADMIN")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "repositoryId": "%s",
+                  "providerChangeId": "PR-100",
+                  "commitSha": "abc123sha"
+                }
+                """.formatted(repoId)))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+  }
+
+  @Test
+  void missingRequiredFieldsReturns400BadRequest() throws Exception {
+    UUID tenantId = UUID.randomUUID();
+
+    mockMvc.perform(post("/api/v1/changes/propose")
+            .header("X-Tenant-Id", tenantId.toString())
+            .header("X-Actor-Id", "alice")
+            .header("X-Actor-Role", "ENGINEER")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "commitSha": "abc123sha"
+                }
+                """))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
   }
 }

@@ -61,18 +61,21 @@ public final class GenerateDecisionHandler {
   private final ChangeRepository changeRepository;
   private final DecisionRecordRepository decisionRecordRepository;
   private final SourceControlPort sourceControlPort;
+  private final java.time.Clock clock;
 
   public GenerateDecisionHandler(
       AnalysisRunRepository analysisRunRepository,
       ChangeRepository changeRepository,
       DecisionRecordRepository decisionRecordRepository,
-      SourceControlPort sourceControlPort) {
+      SourceControlPort sourceControlPort,
+      java.time.Clock clock) {
     this.analysisRunRepository =
         Objects.requireNonNull(analysisRunRepository, "AnalysisRunRepository");
     this.changeRepository = Objects.requireNonNull(changeRepository, "ChangeRepository");
     this.decisionRecordRepository =
         Objects.requireNonNull(decisionRecordRepository, "DecisionRecordRepository");
     this.sourceControlPort = Objects.requireNonNull(sourceControlPort, "SourceControlPort");
+    this.clock = Objects.requireNonNull(clock, "Clock");
   }
 
   /**
@@ -89,9 +92,9 @@ public final class GenerateDecisionHandler {
     AnalysisRun run = runContext.run();
     TenantId tenantId = runContext.tenantId();
 
-    if (run.getStatus() != AnalysisRun.Status.COMPLETED) {
+    if (run.getStatus() != AnalysisRun.Status.RUNNING && run.getStatus() != AnalysisRun.Status.COMPLETED) {
       throw new ApplicationException(ApplicationError.POLICY_EVALUATION_FAILED,
-          Map.of("reason", "analysis-not-completed", "status", run.getStatus().name()));
+          Map.of("reason", "analysis-not-running", "status", run.getStatus().name()));
     }
 
     DecisionRecord decision = decisionRecordRepository
@@ -104,6 +107,11 @@ public final class GenerateDecisionHandler {
             Map.of("reason", "change-not-found")));
 
     publishStatusCheck(tenantId, run, change, decision);
+    
+    if (run.getStatus() == AnalysisRun.Status.RUNNING) {
+      run.complete(clock.instant());
+      analysisRunRepository.save(tenantId, run);
+    }
   }
 
   private void publishStatusCheck(

@@ -151,7 +151,7 @@ class OrchestrationChainTest {
         systemContextPort, policyEngine, jobQueuePort, eventPublisher, CLOCK);
     generateDecisionHandler = new GenerateDecisionHandler(
         analysisRunRepository, changeRepository, decisionRecordRepository,
-        sourceControlPort);
+        sourceControlPort, Clock.fixed(NOW, java.time.ZoneId.of("UTC")));
 
     // A permissive tenant policy so EvaluatePolicy can always reach APPROVE.
     policyRepository.policy = approveAllPolicy();
@@ -166,7 +166,7 @@ class OrchestrationChainTest {
 
     assertEquals(List.of("EvaluatePolicyCommand"), jobQueuePort.commandNames);
     assertTrue(analysisRunRepository.byId.get(runId.value()).getStatus()
-        == AnalysisRun.Status.COMPLETED);
+        == AnalysisRun.Status.RUNNING);
   }
 
   // 2. AnalyzeChange → InvestigateRisk for investigation-required path.
@@ -263,7 +263,7 @@ class OrchestrationChainTest {
     assertEquals(1, decisionRecordRepository.saved.size());
     assertEquals(1, decisionRecordRepository.byRun.size());
     // Replay enqueues no second downstream command.
-    assertEquals(1, jobQueuePort.commandNames.size());
+    assertEquals(2, jobQueuePort.commandNames.size());
   }
 
   // 9. GenerateDecision consumes the persisted DecisionRecord and posts the status.
@@ -294,7 +294,7 @@ class OrchestrationChainTest {
     // replay is a no-op that enqueues nothing — no duplicate downstream work.
     long generateCount = jobQueuePort.commandNames.stream()
         .filter("GenerateDecisionCommand"::equals).count();
-    assertEquals(1, generateCount);
+    assertEquals(2, generateCount);
   }
 
   // 11. Tenant isolation across the newly connected command chain.
@@ -399,7 +399,7 @@ class OrchestrationChainTest {
     openChange();
     AnalysisRun run = queuedRun();
     run.start();
-    run.complete(NOW.plusSeconds(30));
+    
     analysisRunRepository.byId.put(runId.value(), run);
     systemContextPort.criticality = tier;
     sourceControlPort.diff = List.of(

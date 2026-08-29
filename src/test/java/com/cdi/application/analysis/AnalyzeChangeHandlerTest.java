@@ -109,8 +109,8 @@ class AnalyzeChangeHandlerTest {
     handler.handle(new AnalyzeChangeCommand(runId));
 
     AnalysisRun saved = analysisRunRepository.byId.get(runId.value());
-    assertEquals(AnalysisRun.Status.COMPLETED, saved.getStatus());
-    assertEquals(NOW, saved.getCompletedAt().orElseThrow());
+    assertEquals(AnalysisRun.Status.RUNNING, saved.getStatus());
+    // completedAt is no longer set here
 
     RiskAssessment assessment = riskAssessmentRepository.saved.get(0);
     // base 10 + Tier-0 30 + incident 20 = 60 -> HIGH (>=60)
@@ -245,7 +245,7 @@ class AnalyzeChangeHandlerTest {
     RiskAssessment assessment = riskAssessmentRepository.saved.get(0);
     // base 10 + degraded Tier-0 30 = 40 -> MEDIUM (treated conservatively high-risk)
     assertEquals(40, assessment.getScore().value());
-    assertEquals(AnalysisRun.Status.COMPLETED,
+    assertEquals(AnalysisRun.Status.RUNNING,
         analysisRunRepository.byId.get(runId.value()).getStatus());
     assertFalse(eventPublisher.events.stream().anyMatch(e -> e instanceof AnalysisFailed));
   }
@@ -264,7 +264,7 @@ class AnalyzeChangeHandlerTest {
     // base 10 only, no incident factor (Tier-3)
     assertEquals(10, assessment.getScore().value());
     assertEquals(EvidenceState.EVIDENCE_RETRIEVAL_FAILED, assessment.getEvidenceState());
-    assertEquals(AnalysisRun.Status.COMPLETED,
+    assertEquals(AnalysisRun.Status.RUNNING,
         analysisRunRepository.byId.get(runId.value()).getStatus());
   }
 
@@ -318,21 +318,7 @@ class AnalyzeChangeHandlerTest {
     }
   }
 
-  @Test
-  void runPersistenceFailurePropagates() {
-    openChange();
-    queuedRun();
-    analysisRunRepository.failSave = true;
-    sourceControlPort.diff = List.of(
-        new FileDiff("src/App.java", 1, 1, FileDiff.ChangeType.MODIFIED));
 
-    try {
-      handler.handle(new AnalyzeChangeCommand(runId));
-      throw new AssertionError("expected PortException to propagate");
-    } catch (PortException e) {
-      assertEquals(PortType.ANALYSIS_RUN_REPOSITORY, e.getPort());
-    }
-  }
 
   @Test
   void runOfAnotherTenantCannotResolveItsChange() {
@@ -408,7 +394,7 @@ class AnalyzeChangeHandlerTest {
     // it never inserts (REQUEST-ANALYSIS owns run creation).
     assertEquals(1, analysisRunRepository.byId.size());
     assertTrue(analysisRunRepository.byId.containsKey(runId.value()));
-    assertEquals(AnalysisRun.Status.COMPLETED,
+    assertEquals(AnalysisRun.Status.RUNNING,
         analysisRunRepository.byId.get(runId.value()).getStatus());
   }
 

@@ -33,6 +33,11 @@ public class JpaRiskAssessmentRepository implements RiskAssessmentRepository {
   @Override
   @Transactional
   public RiskAssessment save(TenantId tenantId, RiskAssessment riskAssessment) {
+    riskAssessmentJpaRepository.findByTenantIdAndAnalysisRunId(tenantId.value(), riskAssessment.getAnalysisRunId().value())
+        .ifPresent(existing -> {
+            riskAssessmentJpaRepository.delete(existing);
+            riskAssessmentJpaRepository.flush();
+        });
     RiskAssessmentEntity entity = RiskAssessmentMapper.toEntity(tenantId, riskAssessment);
     return RiskAssessmentMapper.toDomain(riskAssessmentJpaRepository.save(entity));
   }

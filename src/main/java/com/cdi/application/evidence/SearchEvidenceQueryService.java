@@ -6,6 +6,7 @@ import com.cdi.application.common.error.ApplicationException;
 import com.cdi.application.common.error.PortException;
 import com.cdi.application.port.in.SearchEvidenceQuery;
 import com.cdi.application.port.out.EvidenceSearchPort;
+import com.cdi.common.domain.exception.DomainException;
 import com.cdi.common.domain.id.TenantId;
 import com.cdi.evidence.domain.EvidenceRecord;
 
@@ -27,8 +28,8 @@ import java.util.Objects;
  * {@code EvidenceSearchPort} for it, it is synchronous and read-only, and its
  * failure contract degrades rather than raising an application error.
  *
- * <p><b>Actor</b> (use-cases.md §6.2): {@code ENGINEER} only; any other role
- * maps to {@link ApplicationError#UNAUTHORIZED}.
+ * <p><b>Actor</b> (use-cases.md §6.2): {@code ENGINEER} or {@code TENANT_ADMIN};
+ * any other role maps to {@link ApplicationError#UNAUTHORIZED}.
  *
  * <p><b>Failure semantics (D5, B4)</b>: a synchronous evidence-search failure
  * surfaces as {@code PortException} from {@code EvidenceSearchPort} and is
@@ -56,7 +57,10 @@ public final class SearchEvidenceQueryService {
   }
 
   private void requireRole(Actor actor) {
-    if (actor.role() != Actor.Role.ENGINEER) {
+    if (actor == null) {
+      throw new DomainException("Actor cannot be null");
+    }
+    if (actor.role() != Actor.Role.ENGINEER && actor.role() != Actor.Role.TENANT_ADMIN) {
       throw new ApplicationException(ApplicationError.UNAUTHORIZED);
     }
   }

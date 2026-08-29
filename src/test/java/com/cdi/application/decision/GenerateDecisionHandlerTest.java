@@ -67,7 +67,11 @@ class GenerateDecisionHandlerTest {
     decisionRecordRepository = new FakeDecisionRecordRepository(tenantId);
     sourceControlPort = new FakeSourceControlPort();
     handler = new GenerateDecisionHandler(
-        analysisRunRepository, changeRepository, decisionRecordRepository, sourceControlPort);
+        analysisRunRepository,
+        changeRepository,
+        decisionRecordRepository,
+        sourceControlPort,
+        java.time.Clock.fixed(NOW, java.time.ZoneId.of("UTC")));
   }
 
   @Test
@@ -103,7 +107,7 @@ class GenerateDecisionHandlerTest {
     ApplicationException ex = assertThrows(ApplicationException.class,
         () -> handler.handle(new GenerateDecisionCommand(runId)));
     assertEquals(ApplicationError.POLICY_EVALUATION_FAILED, ex.getError());
-    assertEquals("analysis-not-completed", ex.getDetails().get("reason"));
+    assertEquals("analysis-not-running", ex.getDetails().get("reason"));
     assertTrue(sourceControlPort.statusChecks.isEmpty());
   }
 

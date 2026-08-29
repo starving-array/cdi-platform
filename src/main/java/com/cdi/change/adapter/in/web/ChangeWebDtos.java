@@ -121,4 +121,19 @@ public final class ChangeWebDtos {
       );
     }
   }
+
+  public record ProposeChangeRequest(
+      UUID repositoryId,
+      String providerChangeId,
+      String commitSha,
+      String branch,
+      String title,
+      String description,
+      String author
+  ) {}
+
+  public record ProposeChangeResponse(
+      UUID analysisRunId,
+      boolean created
+  ) {}
 }

@@ -26,6 +26,12 @@ public final class DevSecurityContext {
   private DevSecurityContext() {}
 
   public static TenantId extractTenantId(HttpServletRequest request) {
+    org.springframework.security.core.Authentication auth =
+        org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+    if (auth instanceof com.cdi.common.adapter.in.security.CdiJwtAuthenticationToken cdiToken) {
+      return cdiToken.getTenantId();
+    }
+
     String tenantHeader = request.getHeader("X-Tenant-Id");
     if (tenantHeader == null || tenantHeader.isBlank()) {
       throw new ApplicationException(ApplicationError.UNAUTHORIZED);
@@ -38,6 +44,12 @@ public final class DevSecurityContext {
   }
 
   public static Actor extractActor(HttpServletRequest request) {
+    org.springframework.security.core.Authentication auth =
+        org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+    if (auth instanceof com.cdi.common.adapter.in.security.CdiJwtAuthenticationToken cdiToken) {
+      return cdiToken.getActor();
+    }
+
     String actorId = request.getHeader("X-Actor-Id");
     if (actorId == null || actorId.isBlank()) {
       actorId = "dev-user";

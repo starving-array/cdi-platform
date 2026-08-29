@@ -37,6 +37,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Application use case UC-05 policy evaluation — the deterministic
  * policy-evaluation stage after InvestigateRisk (analysis-workflow.md §1.7,
@@ -72,6 +75,7 @@ import java.util.Optional;
  */
 public final class EvaluatePolicyHandler {
 
+  private static final Logger log = LoggerFactory.getLogger(EvaluatePolicyHandler.class);
   private static final CriticalityTier DEGRADED_CRITICALITY = CriticalityTier.TIER_0;
 
   private final AnalysisRunRepository analysisRunRepository;
@@ -116,6 +120,7 @@ public final class EvaluatePolicyHandler {
    * persists the resulting decision. Idempotent and replay-safe.
    */
   public DecisionRecord handle(EvaluatePolicyCommand command) {
+
     Optional<AnalysisRunContext> context = analysisRunRepository.findById(command.analysisRunId());
     if (context.isEmpty()) {
       throw new ApplicationException(ApplicationError.POLICY_EVALUATION_FAILED,
@@ -125,13 +130,15 @@ public final class EvaluatePolicyHandler {
     AnalysisRun run = runContext.run();
     TenantId tenantId = runContext.tenantId();
 
-    if (decisionRecordRepository.findByAnalysisRunId(tenantId, run.getId()).isPresent()) {
-      return decisionRecordRepository.findByAnalysisRunId(tenantId, run.getId()).get();
+    Optional<DecisionRecord> existingDecision = decisionRecordRepository.findByAnalysisRunId(tenantId, run.getId());
+    if (existingDecision.isPresent()) {
+      enqueueGenerateDecision(tenantId, run.getId());
+      return existingDecision.get();
     }
 
-    if (run.getStatus() != AnalysisRun.Status.COMPLETED) {
+    if (run.getStatus() != AnalysisRun.Status.RUNNING && run.getStatus() != AnalysisRun.Status.COMPLETED) {
       throw new ApplicationException(ApplicationError.POLICY_EVALUATION_FAILED,
-          Map.of("reason", "analysis-not-completed", "status", run.getStatus().name()));
+          Map.of("reason", "analysis-not-running", "status", run.getStatus().name()));
     }
 
     Change change = changeRepository.findByTenantAndId(tenantId, run.getChangeId())
@@ -147,14 +154,18 @@ public final class EvaluatePolicyHandler {
             Map.of("reason", "policy-not-found")));
 
     CriticalityTier tier = resolveCriticality(tenantId, change, run);
+    
     DecisionRecord decision = evaluate(policy, risk, tier);
 
     decisionRecordRepository.save(tenantId, decision);
+
     publish(DecisionGenerated.create(
         tenantId, run.getId(), change.getId(), decision.getId(),
         decision.getOutcome(), decision.getPolicyVersion(),
         run.getCodeSnapshot().commitSha()));
+    
     enqueueGenerateDecision(tenantId, run.getId());
+    
     return decision;
   }
 

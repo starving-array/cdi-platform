@@ -160,14 +160,18 @@ class GetChangeQueryServicePersistenceIntegrationTest {
   }
 
   @Test
-  void nonEngineerRoleRejected() {
+  void systemWorkerRoleRejectedAndTenantAdminAllowed() {
     Change change = seedChange("PR-42");
 
     ApplicationException ex = assertThrows(ApplicationException.class,
         () -> service.handle(new GetChangeQuery(change.getId()), tenantId,
-            new Actor("admin-1", Actor.Role.TENANT_ADMIN)));
-
+            new Actor("worker-1", Actor.Role.SYSTEM_WORKER)));
     assertEquals(ApplicationError.UNAUTHORIZED, ex.getError());
+
+    ChangeAnalysisView adminView = service.handle(
+        new GetChangeQuery(change.getId()), tenantId,
+        new Actor("admin-1", Actor.Role.TENANT_ADMIN));
+    assertEquals(change.getId(), adminView.change().getId());
   }
 
   @Test

@@ -32,3 +32,9 @@ cdi:
     model-version: all-MiniLM-L6-v2-onnx-v1
   evidence:
     similarity-threshold: 0.65
+  security:
+    jwt:
+      issuer-uri: ${CDI_JWT_ISSUER_URI:}
+      jwk-set-uri: ${CDI_JWT_JWK_SET_URI:}
+      audiences:
+        - ${CDI_JWT_AUDIENCE:cdi-platform-api}

@@ -109,8 +109,8 @@ class InvestigateRiskHandlerTest {
   }
 
   @Test
-  void validCompletedRunInvokesAgentPortAndPersistsCompletedInvestigation() {
-    completedRunWithAssessment();
+  void validRunningRunInvokesAgentPortAndPersistsCompletedInvestigation() {
+    runningRunWithAssessment();
     sourceControlPort.diff = List.of(new FileDiff("src/App.java", 5, 2, FileDiff.ChangeType.MODIFIED));
     evidenceSearchPort.records = List.of(newIncidentRecord());
     agentPort.output = new InvestigationFindings(List.of(
@@ -138,7 +138,7 @@ class InvestigateRiskHandlerTest {
 
   @Test
   void structuredFindingsAreReturnedWithEvidenceAndExplanations() {
-    completedRunWithAssessment();
+    runningRunWithAssessment();
     evidenceSearchPort.records = List.of(newIncidentRecord());
     agentPort.output = new InvestigationFindings(List.of(
         new InvestigationFinding("Finding A", "Explanation A", List.of(incidentId)),
@@ -156,7 +156,7 @@ class InvestigateRiskHandlerTest {
 
   @Test
   void evidenceIdentifiersArePreservedOnFindings() {
-    completedRunWithAssessment();
+    runningRunWithAssessment();
     evidenceSearchPort.records = List.of(newIncidentRecord());
     agentPort.output = new InvestigationFindings(List.of(
         new InvestigationFinding("C", null, List.of(incidentId))));
@@ -170,7 +170,7 @@ class InvestigateRiskHandlerTest {
 
   @Test
   void citationsToUnknownEvidenceAreDroppedNotFabricated() {
-    completedRunWithAssessment();
+    runningRunWithAssessment();
     evidenceSearchPort.records = List.of(newIncidentRecord());
     EvidenceId fabricated = EvidenceId.generate();
     agentPort.output = new InvestigationFindings(List.of(
@@ -187,7 +187,7 @@ class InvestigateRiskHandlerTest {
 
   @Test
   void agentFailureFailsInvestigationButStillEnqueuesPolicyEvaluation() {
-    completedRunWithAssessment();
+    runningRunWithAssessment();
     agentPort.fail = true;
 
     handler.handle(new InvestigateRiskCommand(runId));
@@ -207,7 +207,7 @@ class InvestigateRiskHandlerTest {
   @Test
   void tenantIsolationKeepsRunsAndInvestigationsScoped() {
     TenantId otherTenant = TenantId.generate();
-    AnalysisRun run = completedRun(otherTenant);
+    AnalysisRun run = runningRun(otherTenant);
     riskAssessmentRepository.risk = assessmentFor(run);
 
     handler.handle(new InvestigateRiskCommand(runId));
@@ -221,9 +221,9 @@ class InvestigateRiskHandlerTest {
 
   @Test
   void alreadyInvestigatedRunIsAnIdempotentNoOp() {
-    completedRunWithAssessment();
+    runningRunWithAssessment();
     AgentInvestigation existing = new AgentInvestigation(
-        InvestigationId.generate(), runId, changeId, assessmentFor(completedRun(tenantId)).getId(),
+        InvestigationId.generate(), runId, changeId, assessmentFor(runningRun(tenantId)).getId(),
         NOW.minusSeconds(60));
     existing.start();
     existing.complete(List.of(), NOW.minusSeconds(30));
@@ -261,7 +261,7 @@ class InvestigateRiskHandlerTest {
 
   @Test
   void deterministicRiskAssessmentIsUntouchedByInvestigation() {
-    completedRunWithAssessment();
+    runningRunWithAssessment();
     RiskAssessment before = riskAssessmentRepository.risk;
     agentPort.output = new InvestigationFindings(List.of(
         new InvestigationFinding("C", null, List.of())));
@@ -276,7 +276,7 @@ class InvestigateRiskHandlerTest {
 
   @Test
   void policyEngineIsNeverInvokedByInvestigateRisk() {
-    completedRunWithAssessment();
+    runningRunWithAssessment();
     agentPort.output = new InvestigationFindings(List.of());
 
     handler.handle(new InvestigateRiskCommand(runId));
@@ -289,7 +289,7 @@ class InvestigateRiskHandlerTest {
 
   @Test
   void rawAgentStringCannotDirectlyDriveADecision() {
-    completedRunWithAssessment();
+    runningRunWithAssessment();
     // The port returns the structured carrier type only; the handler never
     // reads an arbitrary raw string and stores it as a decision input.
     assertTrue(agentPort.output == null
@@ -298,9 +298,9 @@ class InvestigateRiskHandlerTest {
 
   // ---- helpers ----
 
-  private void completedRunWithAssessment() {
+  private void runningRunWithAssessment() {
     openChange();
-    AnalysisRun run = completedRun(tenantId);
+    AnalysisRun run = runningRun(tenantId);
     analysisRunRepository.byId.put(runId.value(), run);
     riskAssessmentRepository.risk = assessmentFor(run);
   }
@@ -315,10 +315,10 @@ class InvestigateRiskHandlerTest {
         DeterministicRiskEngine.RULE_VERSION, NOW);
   }
 
-  private AnalysisRun completedRun(TenantId tenant) {
+  private AnalysisRun runningRun(TenantId tenant) {
     AnalysisRun run = queuedRun(tenant);
     run.start();
-    run.complete(NOW.plusSeconds(30));
+    
     return run;
   }
 

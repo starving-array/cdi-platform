@@ -188,9 +188,6 @@ public final class AnalyzeChangeHandler {
     RiskAssessment assessment = riskEngine.assess(run.getId(), input, now);
     riskAssessmentRepository.save(tenantId, assessment);
 
-    run.complete(now);
-    analysisRunRepository.save(tenantId, run);
-
     enqueueNextStage(tenantId, run, assessment, criticality);
 
     publish(RiskAssessed.create(tenantId, run.getId(), change.getId(),

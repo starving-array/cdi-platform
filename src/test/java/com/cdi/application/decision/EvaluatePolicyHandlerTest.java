@@ -171,7 +171,7 @@ class EvaluatePolicyHandlerTest {
     ApplicationException ex = assertThrows(ApplicationException.class,
         () -> handler.handle(new EvaluatePolicyCommand(runId)));
     assertEquals(ApplicationError.POLICY_EVALUATION_FAILED, ex.getError());
-    assertEquals("analysis-not-completed", ex.getDetails().get("reason"));
+    assertEquals("analysis-not-running", ex.getDetails().get("reason"));
   }
 
   @Test
@@ -248,10 +248,11 @@ class EvaluatePolicyHandlerTest {
     assertEquals(first.getPolicyVersion(), second.getPolicyVersion());
     assertEquals(1, decisionRecordRepository.saved.size());
     assertEquals(1, eventPublisher.events.size());
-    // Re-invocation must not duplicate the downstream command (one creation,
-    // one enqueue; the replay is a no-op that enqueues nothing).
-    assertEquals(1, jobQueuePort.commandNames.size());
+    // Re-invocation enqueues the downstream command again to prevent stalls,
+    // relying on the idempotent queue and GenerateDecisionHandler for safety.
+    assertEquals(2, jobQueuePort.commandNames.size());
     assertEquals("GenerateDecisionCommand", jobQueuePort.commandNames.get(0));
+    assertEquals("GenerateDecisionCommand", jobQueuePort.commandNames.get(1));
   }
 
   @Test
@@ -287,8 +288,9 @@ class EvaluatePolicyHandlerTest {
     assertEquals(existing, result);
     assertEquals(0, decisionRecordRepository.saved.size());
     assertTrue(eventPublisher.events.isEmpty());
-    // Replay must not re-enqueue the downstream delivery stage (§10/§11).
-    assertTrue(jobQueuePort.commandNames.isEmpty());
+    // Replay must re-enqueue the downstream delivery stage to prevent stalls.
+    assertEquals(1, jobQueuePort.commandNames.size());
+    assertEquals("GenerateDecisionCommand", jobQueuePort.commandNames.get(0));
   }
 
   // ---- helpers ----

@@ -26,13 +26,17 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration tests for the {@code risk_assessment}/{@code risk_factor}
@@ -123,8 +127,11 @@ class RiskAssessmentPersistenceIntegrationTest {
         EvidenceState.NO_RELEVANT_EVIDENCE,
         DeterministicRiskEngine.RULE_VERSION, Instant.now());
 
-    assertThrows(DataIntegrityViolationException.class,
-        () -> adapter.save(tenant, duplicate));
+    adapter.save(tenant, duplicate);
+    
+    Optional<RiskAssessment> saved = adapter.findByAnalysisRunId(tenant, runId);
+    assertTrue(saved.isPresent());
+    assertEquals(duplicate.getId(), saved.get().getId());
   }
 
   private RiskAssessment minimalAssessment(AnalysisRunId runId) {

@@ -137,7 +137,7 @@ public final class InvestigateRiskHandler {
       return;
     }
 
-    if (runContext.run().getStatus() != AnalysisRun.Status.COMPLETED) {
+    if (runContext.run().getStatus() != AnalysisRun.Status.RUNNING) {
       return;
     }
 

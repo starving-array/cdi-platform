@@ -12,6 +12,7 @@ import com.cdi.application.port.out.ChangeRepository;
 import com.cdi.application.port.out.DecisionRecordRepository;
 import com.cdi.application.port.out.RiskAssessmentRepository;
 import com.cdi.change.domain.Change;
+import com.cdi.common.domain.exception.DomainException;
 import com.cdi.common.domain.id.TenantId;
 
 import java.util.List;
@@ -94,7 +95,10 @@ public final class GetChangeQueryService {
   }
 
   private void requireRole(Actor actor) {
-    if (actor.role() != Actor.Role.ENGINEER) {
+    if (actor == null) {
+      throw new DomainException("Actor cannot be null");
+    }
+    if (actor.role() != Actor.Role.ENGINEER && actor.role() != Actor.Role.TENANT_ADMIN) {
       throw new ApplicationException(ApplicationError.UNAUTHORIZED);
     }
   }

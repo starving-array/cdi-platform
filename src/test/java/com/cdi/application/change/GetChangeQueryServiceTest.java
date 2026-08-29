@@ -157,7 +157,7 @@ class GetChangeQueryServiceTest {
   }
 
   @Test
-  void nonEngineerRoleRejected() {
+  void systemWorkerRoleRejectedAndTenantAdminAllowed() {
     Change change = changeRepository.seed(tenantId, "PR-42");
 
     ApplicationException workerEx = assertThrows(ApplicationException.class,
@@ -165,10 +165,10 @@ class GetChangeQueryServiceTest {
             new Actor("worker-1", Actor.Role.SYSTEM_WORKER)));
     assertEquals(ApplicationError.UNAUTHORIZED, workerEx.getError());
 
-    ApplicationException adminEx = assertThrows(ApplicationException.class,
-        () -> service.handle(new GetChangeQuery(change.getId()), tenantId,
-            new Actor("admin-1", Actor.Role.TENANT_ADMIN)));
-    assertEquals(ApplicationError.UNAUTHORIZED, adminEx.getError());
+    ChangeAnalysisView adminView = service.handle(
+        new GetChangeQuery(change.getId()), tenantId,
+        new Actor("admin-1", Actor.Role.TENANT_ADMIN));
+    assertEquals(change.getId(), adminView.change().getId());
   }
 
   @Test

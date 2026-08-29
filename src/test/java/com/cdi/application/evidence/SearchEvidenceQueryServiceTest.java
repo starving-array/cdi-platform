@@ -81,14 +81,15 @@ class SearchEvidenceQueryServiceTest {
   }
 
   @Test
-  void shouldRejectNonEngineerRoles() {
+  void shouldRejectSystemWorkerAndAllowTenantAdmin() {
     TenantId otherTenant = TenantId.generate();
     evidenceSearchPort.records = List.of(record(tenantId, "Kafka", null, EARLY, 1));
 
-    ApplicationException adminEx = assertThrows(ApplicationException.class,
-        () -> service.handle(new SearchEvidenceQuery("kafka", Map.of()), tenantId,
-            new Actor("admin-1", Actor.Role.TENANT_ADMIN)));
-    assertEquals(ApplicationError.UNAUTHORIZED, adminEx.getError());
+    SearchEvidenceResult adminResult = service.handle(
+        new SearchEvidenceQuery("kafka", Map.of()), tenantId,
+        new Actor("admin-1", Actor.Role.TENANT_ADMIN));
+    assertFalse(adminResult.degraded());
+    assertEquals(1, adminResult.records().size());
 
     ApplicationException workerEx = assertThrows(ApplicationException.class,
         () -> service.handle(new SearchEvidenceQuery("kafka", Map.of()),
