@@ -113,6 +113,7 @@ public class WebAdapterApplicationConfiguration {
   // --- LOCAL BETA ADAPTERS ---
 
   @Bean
+  @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(SourceControlPort.class)
   public SourceControlPort sourceControlPort() {
     return new SourceControlPort() {
       @Override

@@ -32,6 +32,8 @@ cdi:
     model-version: all-MiniLM-L6-v2-onnx-v1
   evidence:
     similarity-threshold: 0.65
+  github:
+    token: ${GITHUB_TOKEN:}
   security:
     jwt:
       issuer-uri: ${CDI_JWT_ISSUER_URI:}
