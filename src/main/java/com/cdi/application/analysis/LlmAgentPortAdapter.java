@@ -208,58 +208,59 @@ public final class LlmAgentPortAdapter implements AgentPort {
 
     // Include code intelligence from Parts 4-10 (via extracted evidence record or direct field)
     sb.append("- Code intelligence:\n");
+      InvestigationCodeIntelligence intel = this.codeIntelligence != null ? this.codeIntelligence : extractedCodeIntelligence;
     sb.append("-   Changed files: ");
-    if (codeIntelligence != null) {
-      sb.append(codeIntelligence.changedFiles().isEmpty() ? "NONE" : redactCredentials(String.join(", ", codeIntelligence.changedFiles())));
+    if (intel != null) {
+      sb.append(intel.changedFiles().isEmpty() ? "NONE" : redactCredentials(String.join(", ", intel.changedFiles())));
     } else {
       sb.append("NONE");
     }
     sb.append("\n");
     sb.append("-   Method signatures: ");
-    if (codeIntelligence != null) {
-      sb.append(codeIntelligence.changedMethodSignatures().isEmpty() ? "NONE" : redactCredentials(String.join(", ", codeIntelligence.changedMethodSignatures())));
+    if (intel != null) {
+      sb.append(intel.changedMethodSignatures().isEmpty() ? "NONE" : redactCredentials(String.join(", ", intel.changedMethodSignatures())));
     } else {
       sb.append("NONE");
     }
     sb.append("\n");
     sb.append("-   Imported types: ");
-    if (codeIntelligence != null) {
-      sb.append(codeIntelligence.importedTypes().isEmpty() ? "NONE" : redactCredentials(String.join(", ", codeIntelligence.importedTypes())));
+    if (intel != null) {
+      sb.append(intel.importedTypes().isEmpty() ? "NONE" : redactCredentials(String.join(", ", intel.importedTypes())));
     } else {
       sb.append("NONE");
     }
     sb.append("\n");
     sb.append("-   Direct callers: ");
-    if (codeIntelligence != null) {
-      sb.append(codeIntelligence.directCallers().isEmpty() ? "NONE" : redactCredentials(String.join(", ", codeIntelligence.directCallers())));
+    if (intel != null) {
+      sb.append(intel.directCallers().isEmpty() ? "NONE" : redactCredentials(String.join(", ", intel.directCallers())));
     } else {
       sb.append("NONE");
     }
     sb.append("\n");
     sb.append("-   Direct callees: ");
-    if (codeIntelligence != null) {
-      sb.append(codeIntelligence.directCallees().isEmpty() ? "NONE" : redactCredentials(String.join(", ", codeIntelligence.directCallees())));
+    if (intel != null) {
+      sb.append(intel.directCallees().isEmpty() ? "NONE" : redactCredentials(String.join(", ", intel.directCallees())));
     } else {
       sb.append("NONE");
     }
     sb.append("\n");
     sb.append("-   Impact graph edges: ");
-    if (codeIntelligence != null) {
-      sb.append(codeIntelligence.impactGraphEdges().isEmpty() ? "NONE" : redactCredentials(String.join(", ", codeIntelligence.impactGraphEdges())));
+    if (intel != null) {
+      sb.append(intel.impactGraphEdges().isEmpty() ? "NONE" : redactCredentials(String.join(", ", intel.impactGraphEdges())));
     } else {
       sb.append("NONE");
     }
     sb.append("\n");
     sb.append("-   Dependency paths: ");
-    if (codeIntelligence != null) {
-      sb.append(codeIntelligence.dependencyPaths().isEmpty() ? "NONE" : redactCredentials(String.join(", ", codeIntelligence.dependencyPaths())));
+    if (intel != null) {
+      sb.append(intel.dependencyPaths().isEmpty() ? "NONE" : redactCredentials(String.join(", ", intel.dependencyPaths())));
     } else {
       sb.append("NONE");
     }
     sb.append("\n");
     sb.append("-   Availability states: ");
-    if (codeIntelligence != null) {
-      sb.append(codeIntelligence.availabilityStates().isEmpty() ? "NONE" : redactCredentials(String.join(", ", codeIntelligence.availabilityStates())));
+    if (intel != null) {
+      sb.append(intel.availabilityStates().isEmpty() ? "NONE" : redactCredentials(String.join(", ", intel.availabilityStates())));
     } else {
       sb.append("NONE");
     }

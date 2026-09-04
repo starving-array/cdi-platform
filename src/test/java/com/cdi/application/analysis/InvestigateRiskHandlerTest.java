@@ -105,7 +105,7 @@ class InvestigateRiskHandlerTest {
     handler = new InvestigateRiskHandler(
         analysisRunRepository, changeRepository, riskAssessmentRepository,
         agentInvestigationRepository, sourceControlPort, evidenceSearchPort,
-        agentPort, jobQueuePort, eventPublisher, CLOCK);
+        agentPort, jobQueuePort, eventPublisher, CLOCK, new CodeContextAssembler(sourceControlPort));
   }
 
   @Test

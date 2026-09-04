@@ -224,11 +224,12 @@ public class WebAdapterApplicationConfiguration {
       EvidenceSearchPort evidenceSearchPort,
       AgentPort agentPort,
       JobQueuePort jobQueuePort,
-      DomainEventPublisher domainEventPublisher) {
+      DomainEventPublisher domainEventPublisher,
+      com.cdi.application.analysis.CodeContextAssembler codeContextAssembler) {
     return new com.cdi.application.analysis.InvestigateRiskHandler(
         analysisRunRepository, changeRepository, riskAssessmentRepository,
         agentInvestigationRepository, sourceControlPort, evidenceSearchPort, agentPort,
-        jobQueuePort, domainEventPublisher, Clock.systemUTC());
+        jobQueuePort, domainEventPublisher, Clock.systemUTC(), codeContextAssembler);
   }
 
   @Bean

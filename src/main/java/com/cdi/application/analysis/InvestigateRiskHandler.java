@@ -99,6 +99,7 @@ public final class InvestigateRiskHandler {
   private final JobQueuePort jobQueuePort;
   private final DomainEventPublisher eventPublisher;
   private final Clock clock;
+  private final CodeContextAssembler codeContextAssembler;
 
   public InvestigateRiskHandler(
       AnalysisRunRepository analysisRunRepository,
@@ -110,7 +111,8 @@ public final class InvestigateRiskHandler {
       AgentPort agentPort,
       JobQueuePort jobQueuePort,
       DomainEventPublisher eventPublisher,
-      Clock clock) {
+      Clock clock,
+      CodeContextAssembler codeContextAssembler) {
     this.analysisRunRepository = Objects.requireNonNull(analysisRunRepository, "AnalysisRunRepository");
     this.changeRepository = Objects.requireNonNull(changeRepository, "ChangeRepository");
     this.riskAssessmentRepository = Objects.requireNonNull(riskAssessmentRepository, "RiskAssessmentRepository");
@@ -121,6 +123,7 @@ public final class InvestigateRiskHandler {
     this.jobQueuePort = Objects.requireNonNull(jobQueuePort, "JobQueuePort");
     this.eventPublisher = Objects.requireNonNull(eventPublisher, "DomainEventPublisher");
     this.clock = Objects.requireNonNull(clock, "Clock");
+    this.codeContextAssembler = Objects.requireNonNull(codeContextAssembler, "CodeContextAssembler");
   }
 
   /**
@@ -325,56 +328,67 @@ public final class InvestigateRiskHandler {
    */
   private InvestigationCodeIntelligence computeCodeIntelligence(
       TenantId tenantId, Change change, String commitSha) {
-    List<String> changedFiles = List.of();
+    List<String> changedFiles = new ArrayList<>();
     List<String> changedMethodSignatures = new ArrayList<>();
-    Set<String> importedTypes = java.util.Set.of();
+    Set<String> importedTypes = new HashSet<>();
     List<String> directCallers = new ArrayList<>();
     List<String> directCallees = new ArrayList<>();
     List<String> impactGraphEdges = new ArrayList<>();
     List<String> dependencyPaths = new ArrayList<>();
-    Set<String> availabilityStates = java.util.Set.of("UNKNOWN");
+    Set<String> availabilityStates = new HashSet<>();
 
+    List<FileDiff> diff = null;
     try {
-      List<FileDiff> diff =
-          sourceControlPort.getDiff(tenantId, change.getRepositoryId(), commitSha);
+      diff = sourceControlPort.getDiff(tenantId, change.getRepositoryId(), commitSha);
       if (diff != null) {
-        changedFiles = diff.stream()
-            .map(FileDiff::path)
-            .toList();
+        changedFiles = diff.stream().map(FileDiff::path).collect(Collectors.toList());
       }
     } catch (PortException e) {
-      // Diff unavailable — keep changedFiles empty; availability states below
-      // will reflect the failure.
+      availabilityStates.add("UNKNOWN");
     }
 
-    try {
-      // Collect changed-file-level structural information without exposing
-      // JavaParser AST objects through the investigation boundary (per
-      // application-layer.md §7).  Record what we can retrieve and set
-      // availability states accordingly.
-      for (String filePath : changedFiles) {
-        try {
-          byte[] content =
-              sourceControlPort.getFileContent(tenantId, change.getRepositoryId(), filePath, commitSha);
-          if (content != null && content.length > 0) {
-            // File content retrieved successfully — record availability.
-            // Method/import parsing is deferred to the LLM investigation stage;
-            // the mere availability of source content is itself meaningful
-            // code intelligence for the investigation prompt.
+    if (diff != null && !diff.isEmpty()) {
+      try {
+        com.cdi.analysis.domain.CodeContext context = codeContextAssembler.assemble(tenantId, change.getRepositoryId(), commitSha, diff);
+        com.cdi.analysis.domain.parsing.JavaChangeAnalyzer changeAnalyzer = new com.cdi.analysis.domain.parsing.JavaChangeAnalyzer();
+        com.cdi.analysis.domain.parsing.JavaChangeAnalysis changeAnalysis = changeAnalyzer.analyze(context);
+
+        com.cdi.analysis.domain.parsing.JavaDependencyAnalyzer dependencyAnalyzer = new com.cdi.analysis.domain.parsing.JavaDependencyAnalyzer();
+        com.cdi.analysis.domain.parsing.DependencyAnalysis dependencyAnalysis = dependencyAnalyzer.analyze(context);
+
+        com.cdi.analysis.domain.parsing.ImpactGraph impactGraph = new com.cdi.analysis.domain.parsing.ImpactGraph(dependencyAnalysis);
+        com.cdi.analysis.domain.parsing.ImpactGraphResult impactGraphResult = impactGraph.build();
+
+        for (com.cdi.analysis.domain.parsing.JavaFileChange fileChange : changeAnalysis.files()) {
+          importedTypes.addAll(fileChange.imports());
+          for (com.cdi.analysis.domain.parsing.TypeChange type : fileChange.types()) {
+            for (com.cdi.analysis.domain.parsing.MemberChange m : type.methods()) {
+              if (m.changed()) changedMethodSignatures.add(type.name() + "." + m.name());
+            }
+            for (com.cdi.analysis.domain.parsing.MemberChange m : type.constructors()) {
+              if (m.changed()) changedMethodSignatures.add(type.name() + "." + m.name());
+            }
           }
-        } catch (PortException ignored) {
-          // File content unavailable for this path — availability states below
-          // will reflect the gap.
         }
-      }
-    } catch (Exception e) {
-      // Diff/content retrieval failure — availability states will reflect it.
-    }
 
-    availabilityStates = java.util.Set.of(
-        changedFiles.isEmpty() ? "NO_FILES" : "FILES_RETRIEVED",
-        changedMethodSignatures.isEmpty() ? "NO_METHODS" : "METHODS_PARSED",
-        importedTypes.isEmpty() ? "NO_IMPORTS" : "IMPORTS_PARSED");
+        for (com.cdi.analysis.domain.parsing.ImpactGraphEdge edge : impactGraphResult.edges) {
+          impactGraphEdges.add(edge.edgeType() + ":" + edge.sourceMember() + "->" + edge.targetMember());
+          if ("CALLS".equals(edge.edgeType())) directCallees.add(edge.targetMember());
+          if ("CALLED_BY".equals(edge.edgeType())) directCallers.add(edge.sourceMember());
+          if ("TYPE_DEPENDENCY".equals(edge.edgeType())) dependencyPaths.add(edge.targetMember());
+        }
+
+        availabilityStates.add(changedFiles.isEmpty() ? "NO_FILES" : "FILES_RETRIEVED");
+        availabilityStates.add(changedMethodSignatures.isEmpty() ? "NO_METHODS" : "METHODS_PARSED");
+        availabilityStates.add(importedTypes.isEmpty() ? "NO_IMPORTS" : "IMPORTS_PARSED");
+      } catch (Exception e) {
+        availabilityStates.add("UNKNOWN");
+      }
+    } else {
+        availabilityStates.add(changedFiles.isEmpty() ? "NO_FILES" : "FILES_RETRIEVED");
+        availabilityStates.add("NO_METHODS");
+        availabilityStates.add("NO_IMPORTS");
+    }
 
     return new InvestigationCodeIntelligence(
         commitSha,
@@ -387,6 +401,7 @@ public final class InvestigateRiskHandler {
         dependencyPaths,
         availabilityStates);
   }
+
 
   private void enqueueEvaluatePolicy(AnalysisRunId runId, TenantId tenantId) {
     jobQueuePort.enqueue("EvaluatePolicyCommand", new EvaluatePolicyCommand(runId),
