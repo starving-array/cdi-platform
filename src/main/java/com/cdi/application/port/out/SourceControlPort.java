@@ -27,6 +27,19 @@ public interface SourceControlPort {
 
   List<FileDiff> getDiff(TenantId tenantId, RepositoryId repositoryId, String commitSha);
 
+  /**
+   * Retrieves the raw bytes of a single file at the EXACT requested commit.
+   *
+   * <p>The {@code commitSha} is authoritative: implementations must query the
+   * requested SHA and MUST NOT fall back to the default branch, a branch HEAD,
+   * or any other ref when the requested commit fails.
+   *
+   * <p>Raw bytes are returned so callers decide text decoding; binary files are
+   * therefore handled safely. A missing file, a directory path, or unusable
+   * content is surfaced as a domain exception from the adapter.
+   */
+  byte[] getFileContent(TenantId tenantId, RepositoryId repositoryId, String path, String commitSha);
+
   void publishStatusCheck(
       TenantId tenantId,
       RepositoryId repositoryId,

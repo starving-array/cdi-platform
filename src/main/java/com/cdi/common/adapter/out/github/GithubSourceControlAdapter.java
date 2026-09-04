@@ -28,12 +28,24 @@ public class GithubSourceControlAdapter implements SourceControlPort {
 
     private final RepositoryRepository repositoryRepository;
     private final RestTemplate restTemplate;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     public GithubSourceControlAdapter(
             RepositoryRepository repositoryRepository,
             @Value("${cdi.github.token}") String githubToken,
             RestTemplateBuilder restTemplateBuilder) {
+        this(repositoryRepository, githubToken, restTemplateBuilder,
+                new com.fasterxml.jackson.databind.ObjectMapper());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public GithubSourceControlAdapter(
+            RepositoryRepository repositoryRepository,
+            @Value("${cdi.github.token}") String githubToken,
+            RestTemplateBuilder restTemplateBuilder,
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.repositoryRepository = repositoryRepository;
+        this.objectMapper = objectMapper;
         this.restTemplate = restTemplateBuilder
                 .defaultHeader("Authorization", "Bearer " + githubToken)
                 .defaultHeader("Accept", "application/vnd.github.v3+json")
@@ -125,11 +137,76 @@ public class GithubSourceControlAdapter implements SourceControlPort {
                     case "removed" -> FileDiff.ChangeType.DELETED;
                     default -> FileDiff.ChangeType.MODIFIED;
                 };
-                diffs.add(new FileDiff(file.filename(), file.additions(), file.deletions(), changeType));
+                diffs.add(new FileDiff(file.filename(), file.additions(), file.deletions(), changeType, file.patch()));
             }
             return diffs;
         } catch (RestClientResponseException e) {
             throw new DomainException("Failed to fetch diff from GitHub: " + e.getStatusCode());
+        }
+    }
+
+    /**
+     * Retrieves one file's raw bytes from the GitHub Contents API at the
+     * EXACT requested commit. The SHA is sent as {@code ?ref=<sha>}; on any
+     * failure (404, directory path, unsupported encoding) a
+     * {@link DomainException} is thrown — no fallback ref is ever attempted.
+     */
+    @Override
+    public byte[] getFileContent(TenantId tenantId, RepositoryId repositoryId, String path, String commitSha) {
+        if (path == null || path.isBlank()) {
+            throw new DomainException("File path cannot be blank");
+        }
+        if (commitSha == null || commitSha.isBlank()) {
+            throw new DomainException("Commit SHA cannot be blank");
+        }
+        Repository repo = getRepository(tenantId, repositoryId);
+        String fullName = getFullName(repo);
+        String[] parts = fullName.split("/");
+        if (parts.length != 2) throw new DomainException("Invalid repository full name");
+
+        try {
+            ResponseEntity<String> response = restTemplate.getForEntity(
+                    "/repos/{owner}/{repo}/contents/{path}?ref={sha}", String.class,
+                    parts[0], parts[1], path.trim(), commitSha.trim());
+
+            String body = response.getBody();
+            if (body == null || body.isBlank()) {
+                throw new DomainException("Empty content response for file: " + path);
+            }
+            return decodeContentsApiBody(body, path);
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                throw new DomainException("File not found at requested commit: " + path);
+            }
+            throw new DomainException("Error fetching file content: " + e.getStatusCode());
+        }
+    }
+
+    private byte[] decodeContentsApiBody(String body, String path) {
+        String trimmed = body.trim();
+        if (trimmed.startsWith("[")) {
+            // The Contents API returns a JSON array for directories.
+            throw new DomainException("Path is a directory, not a file: " + path);
+        }
+        final com.fasterxml.jackson.databind.JsonNode node;
+        try {
+            node = objectMapper.readTree(trimmed);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new DomainException("Invalid content response from GitHub");
+        }
+        String type = node.path("type").asText("");
+        if (!"file".equals(type)) {
+            throw new DomainException("Path is not a regular file (type=" + type + "): " + path);
+        }
+        String encoding = node.path("encoding").asText("");
+        if (!"base64".equals(encoding)) {
+            throw new DomainException("Unsupported content encoding: " + encoding);
+        }
+        String encoded = node.path("content").asText("").replaceAll("\\s", "");
+        try {
+            return java.util.Base64.getDecoder().decode(encoded);
+        } catch (IllegalArgumentException e) {
+            throw new DomainException("Could not decode file content: " + path);
         }
     }
 
@@ -165,7 +242,7 @@ public class GithubSourceControlAdapter implements SourceControlPort {
     record GithubRef(String ref, String sha) {}
     record GithubPullResponse(String title, String body, GithubUser user, GithubRef head, GithubRef base) {}
 
-    record GithubFile(String filename, int additions, int deletions, String status) {}
+    record GithubFile(String filename, int additions, int deletions, String status, String patch) {}
     record GithubCommitResponse(List<GithubFile> files) {}
 
     record GithubStatusRequest(String state, String target_url, String description, String context) {}

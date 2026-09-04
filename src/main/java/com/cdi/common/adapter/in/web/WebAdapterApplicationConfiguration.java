@@ -17,6 +17,11 @@ import com.cdi.application.port.out.AgentInvestigationRepository;
 import com.cdi.application.port.out.PolicyRepository;
 import com.cdi.application.common.event.DomainEventPublisher;
 import com.cdi.analysis.domain.FileDiff;
+import com.cdi.application.analysis.DefaultLlmClient;
+import com.cdi.application.analysis.FakeLlmClient;
+import com.cdi.application.analysis.LlmAgentPortAdapter;
+import com.cdi.application.analysis.LlmClient;
+import com.cdi.application.analysis.LlmConfig;
 import com.cdi.common.domain.id.RepositoryId;
 import com.cdi.common.domain.id.ServiceId;
 import com.cdi.common.domain.id.TenantId;
@@ -34,6 +39,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import java.util.List;
 import java.time.Clock;
+import java.time.Duration;
 
 @Configuration
 public class WebAdapterApplicationConfiguration {
@@ -125,6 +131,10 @@ public class WebAdapterApplicationConfiguration {
         return List.of();
       }
       @Override
+      public byte[] getFileContent(TenantId tenantId, RepositoryId repositoryId, String path, String commitSha) {
+        return new byte[0];
+      }
+      @Override
       public void publishStatusCheck(TenantId tenantId, RepositoryId repositoryId, String commitSha, DecisionOutcome outcome, List<DecisionReason> reasons, String detailsUrl) {
       }
     };
@@ -145,13 +155,29 @@ public class WebAdapterApplicationConfiguration {
   }
 
   @Bean
-  public AgentPort agentPort() {
-    return new AgentPort() {
-      @Override
-      public InvestigationFindings investigate(AgentContext context, RiskAssessment riskAssessment, List<EvidenceRecord> evidence) {
-        return new InvestigationFindings(List.of());
-      }
-    };
+  public LlmConfig llmConfig(org.springframework.core.env.Environment env) {
+    String endpoint = env.getProperty("llm.endpoint", "");
+    String model = env.getProperty("llm.model", "default");
+    String timeoutStr = env.getProperty("llm.timeout", "300");
+    Duration timeout = Duration.ofSeconds(Integer.parseInt(timeoutStr));
+    String apiKey = env.getProperty("llm.api.key", "");
+    return new LlmConfig(endpoint, model, timeout, apiKey);
+  }
+
+  @Bean
+  public LlmClient llmClient(LlmConfig llmConfig) {
+    if (llmConfig.hasApiKey()) {
+      // In a full implementation, return new DefaultLlmClient(llmConfig);
+      // For Part 11 we use the fake client even when configured,
+      // to keep the test suite independent of external services.
+      return new FakeLlmClient();
+    }
+    return new FakeLlmClient();
+  }
+
+  @Bean
+  public AgentPort agentPort(LlmConfig llmConfig) {
+    return new LlmAgentPortAdapter(new FakeLlmClient(), llmConfig);
   }
 
   @Bean
@@ -165,6 +191,12 @@ public class WebAdapterApplicationConfiguration {
   }
 
   @Bean
+  public com.cdi.application.analysis.CodeContextAssembler codeContextAssembler(
+      SourceControlPort sourceControlPort) {
+    return new com.cdi.application.analysis.CodeContextAssembler(sourceControlPort);
+  }
+
+  @Bean
   public com.cdi.application.analysis.AnalyzeChangeHandler analyzeChangeHandler(
       ChangeRepository changeRepository,
       AnalysisRunRepository analysisRunRepository,
@@ -174,11 +206,12 @@ public class WebAdapterApplicationConfiguration {
       EvidenceSearchPort evidenceSearchPort,
       JobQueuePort jobQueuePort,
       DomainEventPublisher domainEventPublisher,
-      com.cdi.risk.domain.DeterministicRiskEngine deterministicRiskEngine) {
+      com.cdi.risk.domain.DeterministicRiskEngine deterministicRiskEngine,
+      com.cdi.application.analysis.CodeContextAssembler codeContextAssembler) {
     return new com.cdi.application.analysis.AnalyzeChangeHandler(
         changeRepository, analysisRunRepository, riskAssessmentRepository,
         sourceControlPort, systemContextPort, evidenceSearchPort, jobQueuePort,
-        domainEventPublisher, deterministicRiskEngine, Clock.systemUTC());
+        domainEventPublisher, deterministicRiskEngine);
   }
 
   @Bean

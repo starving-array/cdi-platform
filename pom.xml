@@ -73,6 +73,13 @@
             <version>0.27.0</version>
         </dependency>
 
+        <!-- Java source parsing for code intelligence (PART 5) -->
+        <dependency>
+            <groupId>com.github.javaparser</groupId>
+            <artifactId>javaparser-core</artifactId>
+            <version>3.25.10</version>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

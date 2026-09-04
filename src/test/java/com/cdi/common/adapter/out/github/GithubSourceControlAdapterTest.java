@@ -112,6 +112,188 @@ class GithubSourceControlAdapterTest {
     }
 
     @Test
+    void getDiff_preservesPatchContent() {
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repositories/12345"))
+                .andRespond(MockRestResponseCreators.withSuccess("{\"full_name\": \"owner/test-repo\"}", MediaType.APPLICATION_JSON));
+
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repos/owner/test-repo/commits/abc1234"))
+                .andRespond(MockRestResponseCreators.withSuccess("""
+                        {
+                          "files": [
+                            {"filename": "a.java", "additions": 10, "deletions": 2, "status": "modified", "patch": "@@ -1,3 +1,3 @@\\n-old\\n+new"},
+                            {"filename": "b.java", "additions": 5, "deletions": 0, "status": "added", "patch": "@@ -0,0 +1,5 @@\\n+content"},
+                            {"filename": "c.java", "additions": 0, "deletions": 8, "status": "removed", "patch": "@@ -1,8 +0,0 @@\\n-gone"},
+                            {"filename": "d.java", "additions": 1, "deletions": 1, "status": "renamed", "patch": "@@ -1 +1 @@\\n-ren\\n+ened"}
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        List<FileDiff> diffs = adapter.getDiff(tenantId, repoId, "abc1234");
+
+        assertEquals(4, diffs.size());
+        assertEquals("@@ -1,3 +1,3 @@\n-old\n+new", diffs.get(0).patch());
+        assertEquals(FileDiff.ChangeType.MODIFIED, diffs.get(0).changeType());
+        assertEquals("@@ -0,0 +1,5 @@\n+content", diffs.get(1).patch());
+        assertEquals(FileDiff.ChangeType.ADDED, diffs.get(1).changeType());
+        assertEquals("@@ -1,8 +0,0 @@\n-gone", diffs.get(2).patch());
+        assertEquals(FileDiff.ChangeType.DELETED, diffs.get(2).changeType());
+        assertEquals("@@ -1 +1 @@\n-ren\n+ened", diffs.get(3).patch());
+        assertEquals(FileDiff.ChangeType.MODIFIED, diffs.get(3).changeType());
+    }
+
+    @Test
+    void getDiff_missingPatchIsNull_notCrash() {
+        // Binary files / large diffs: GitHub omits the patch field entirely.
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repositories/12345"))
+                .andRespond(MockRestResponseCreators.withSuccess("{\"full_name\": \"owner/test-repo\"}", MediaType.APPLICATION_JSON));
+
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repos/owner/test-repo/commits/abc1234"))
+                .andRespond(MockRestResponseCreators.withSuccess("""
+                        {
+                          "files": [
+                            {"filename": "image.png", "additions": 0, "deletions": 0, "status": "modified"},
+                            {"filename": "big.jar", "additions": 0, "deletions": 0, "status": "removed", "patch": null}
+                          ]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        List<FileDiff> diffs = adapter.getDiff(tenantId, repoId, "abc1234");
+
+        assertEquals(2, diffs.size());
+        assertTrue(diffs.get(0).patchOptional().isEmpty());
+        assertNull(diffs.get(1).patch());
+        assertTrue(diffs.get(1).patchOptional().isEmpty());
+    }
+
+    // --- PART 3: getFileContent at the exact commit SHA ---
+
+    @Test
+    void getFileContent_retrievesAtExactSha_andDecodesBase64() {
+        String javaSource = "package demo;\npublic class PaymentService {}\n";
+        String base64 = java.util.Base64.getEncoder().encodeToString(javaSource.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repositories/12345"))
+                .andRespond(MockRestResponseCreators.withSuccess("{\"full_name\": \"owner/test-repo\"}", MediaType.APPLICATION_JSON));
+
+        // Requested SHA (e6c258...) differs from the repository default-branch HEAD —
+        // the adapter MUST send the requested SHA as ref, never the branch.
+        mockServer.expect(MockRestRequestMatchers.requestTo(org.hamcrest.Matchers.containsString(
+                        "/repos/owner/test-repo/contents/src%2Fmain%2FPaymentService.java?ref=e6c2584f24584da6017c3b89140e96aa1416b7b4")))
+                .andExpect(MockRestRequestMatchers.method(HttpMethod.GET))
+                .andRespond(MockRestResponseCreators.withSuccess("""
+                        {
+                          "type": "file",
+                          "encoding": "base64",
+                          "content": \"""" + base64 + """
+                        "
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        byte[] content = adapter.getFileContent(tenantId, repoId, "src/main/PaymentService.java",
+                "e6c2584f24584da6017c3b89140e96aa1416b7b4");
+
+        assertEquals(javaSource, new String(content, java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void getFileContent_emptyFile_returnsEmptyBytes() {
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repositories/12345"))
+                .andRespond(MockRestResponseCreators.withSuccess("{\"full_name\": \"owner/test-repo\"}", MediaType.APPLICATION_JSON));
+        mockServer.expect(MockRestRequestMatchers.requestTo(org.hamcrest.Matchers.containsString(
+                        "/repos/owner/test-repo/contents/empty.txt?ref=abc1234")))
+                .andRespond(MockRestResponseCreators.withSuccess(
+                        "{\"type\": \"file\", \"encoding\": \"base64\", \"content\": \"\"}", MediaType.APPLICATION_JSON));
+
+        byte[] content = adapter.getFileContent(tenantId, repoId, "empty.txt", "abc1234");
+        assertEquals(0, content.length);
+    }
+
+    @Test
+    void getFileContent_binaryFile_returnsRawBytes() {
+        byte[] binary = new byte[] {0x00, 0x01, (byte) 0xFF, 0x10, 0x7F, (byte) 0x80};
+        String base64 = java.util.Base64.getEncoder().encodeToString(binary);
+
+        // Base64 with embedded newlines, as returned by the real Contents API.
+        String multilineB64 = base64.substring(0, 4) + "\\n" + base64.substring(4);
+
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repositories/12345"))
+                .andRespond(MockRestResponseCreators.withSuccess("{\"full_name\": \"owner/test-repo\"}", MediaType.APPLICATION_JSON));
+        mockServer.expect(MockRestRequestMatchers.requestTo(org.hamcrest.Matchers.containsString(
+                        "/repos/owner/test-repo/contents/icon.png?ref=abc1234")))
+                .andRespond(MockRestResponseCreators.withSuccess("""
+                        {"type": "file", "encoding": "base64", "content": \"""" + multilineB64 + """
+                        "}
+                        """, MediaType.APPLICATION_JSON));
+
+        byte[] content = adapter.getFileContent(tenantId, repoId, "icon.png", "abc1234");
+        assertArrayEquals(binary, content);
+    }
+
+    @Test
+    void getFileContent_missingFile_throwsDomainException() {
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repositories/12345"))
+                .andRespond(MockRestResponseCreators.withSuccess("{\"full_name\": \"owner/test-repo\"}", MediaType.APPLICATION_JSON));
+        mockServer.expect(MockRestRequestMatchers.requestTo(org.hamcrest.Matchers.containsString(
+                        "/repos/owner/test-repo/contents/gone.java?ref=abc1234")))
+                .andRespond(MockRestResponseCreators.withStatus(HttpStatus.NOT_FOUND));
+
+        DomainException ex = assertThrows(DomainException.class,
+                () -> adapter.getFileContent(tenantId, repoId, "gone.java", "abc1234"));
+        assertTrue(ex.getMessage().contains("not found"));
+    }
+
+    @Test
+    void getFileContent_directoryPath_isRejected() {
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repositories/12345"))
+                .andRespond(MockRestResponseCreators.withSuccess("{\"full_name\": \"owner/test-repo\"}", MediaType.APPLICATION_JSON));
+        mockServer.expect(MockRestRequestMatchers.requestTo(org.hamcrest.Matchers.containsString(
+                        "/repos/owner/test-repo/contents/src?ref=abc1234")))
+                .andRespond(MockRestResponseCreators.withSuccess(
+                        "[{\"type\": \"file\", \"name\": \"App.java\"}]", MediaType.APPLICATION_JSON));
+
+        DomainException ex = assertThrows(DomainException.class,
+                () -> adapter.getFileContent(tenantId, repoId, "src", "abc1234"));
+        assertTrue(ex.getMessage().contains("directory"));
+    }
+
+    @Test
+    void getFileContent_unsupportedEncoding_isRejected() {
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repositories/12345"))
+                .andRespond(MockRestResponseCreators.withSuccess("{\"full_name\": \"owner/test-repo\"}", MediaType.APPLICATION_JSON));
+        mockServer.expect(MockRestRequestMatchers.requestTo(org.hamcrest.Matchers.containsString(
+                        "/repos/owner/test-repo/contents/symlink?ref=abc1234")))
+                .andRespond(MockRestResponseCreators.withSuccess(
+                        "{\"type\": \"symlink\", \"content\": \"eGFpbQ==\"}", MediaType.APPLICATION_JSON));
+
+        DomainException ex = assertThrows(DomainException.class,
+                () -> adapter.getFileContent(tenantId, repoId, "symlink", "abc1234"));
+        assertTrue(ex.getMessage().contains("not a regular file") || ex.getMessage().contains("directory"));
+    }
+
+    @Test
+    void getFileContent_blankSha_rejectedWithoutHttpCall() {
+        // No mock expectations configured: any HTTP call would fail the test.
+        assertThrows(DomainException.class,
+                () -> adapter.getFileContent(tenantId, repoId, "src/App.java", "  "));
+        assertThrows(DomainException.class,
+                () -> adapter.getFileContent(tenantId, repoId, "  ", "abc1234"));
+    }
+
+    @Test
+    void getFileContent_neverFallsBackToBranchHead() {
+        // Only the /repositories lookup is allowed; the requested SHA must appear in the
+        // contents request and no request may target a branch name instead of the SHA.
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repositories/12345"))
+                .andRespond(MockRestResponseCreators.withSuccess("{\"full_name\": \"owner/test-repo\"}", MediaType.APPLICATION_JSON));
+        mockServer.expect(MockRestRequestMatchers.requestTo(org.hamcrest.Matchers.containsString("?ref=requested-sha-999")))
+                .andRespond(MockRestResponseCreators.withStatus(HttpStatus.NOT_FOUND));
+
+        assertThrows(DomainException.class,
+                () -> adapter.getFileContent(tenantId, repoId, "src/App.java", "requested-sha-999"));
+        mockServer.verify(); // fails if the adapter retried with another ref
+    }
+
+    @Test
     void getDiff_emptyFiles() {
         mockServer.expect(MockRestRequestMatchers.requestTo("/repositories/12345"))
                 .andRespond(MockRestResponseCreators.withSuccess("{\"full_name\": \"owner/test-repo\"}", MediaType.APPLICATION_JSON));

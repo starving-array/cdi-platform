@@ -2,6 +2,8 @@ package com.cdi.analysis.domain;
 
 import com.cdi.common.domain.exception.DomainException;
 
+import java.util.Optional;
+
 /**
  * Value object describing one changed file in a code snapshot.
  *
@@ -11,12 +13,20 @@ import com.cdi.common.domain.exception.DomainException;
  * snapshot side of an {@code AnalysisRun}, not on the {@code Change}
  * aggregate.
  */
-public record FileDiff(String path, int additions, int deletions, ChangeType changeType) {
+public record FileDiff(String path, int additions, int deletions, ChangeType changeType, String patch) {
 
   public enum ChangeType {
     ADDED,
     MODIFIED,
     DELETED
+  }
+
+  /**
+   * Backward-compatible constructor without patch content (for source-control
+   * adapters that do not provide textual patches).
+   */
+  public FileDiff(String path, int additions, int deletions, ChangeType changeType) {
+    this(path, additions, deletions, changeType, null);
   }
 
   public FileDiff {
@@ -33,5 +43,16 @@ public record FileDiff(String path, int additions, int deletions, ChangeType cha
       throw new DomainException("Change type cannot be null");
     }
     path = path.trim();
+  }
+
+  /**
+   * Convenience accessor: the raw textual patch for this file, if the
+   * source-control provider supplied one (e.g. GitHub's {@code patch} field).
+   * Empty when the provider omitted it (binary files, large diffs, unsupported
+   * encodings). The record's {@code patch()} returns the raw, possibly-null
+   * value; this wraps it for optional chaining.
+   */
+  public Optional<String> patchOptional() {
+    return Optional.ofNullable(patch);
   }
 }

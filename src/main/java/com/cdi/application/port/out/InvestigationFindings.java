@@ -13,4 +13,14 @@ public record InvestigationFindings(List<InvestigationFinding> findings) {
   public InvestigationFindings {
     findings = findings == null ? List.of() : List.copyOf(findings);
   }
+
+  /** Creates an {@link InvestigationFindings} from a list of findings. */
+  public static InvestigationFindings of(List<InvestigationFinding> findings) {
+    return new InvestigationFindings(findings);
+  }
+
+  /** Creates an empty {@link InvestigationFindings}. */
+  public static InvestigationFindings of() {
+    return new InvestigationFindings(List.of());
+  }
 }

@@ -143,6 +143,11 @@ class PortContractTest {
     }
 
     @Override
+    public byte[] getFileContent(TenantId tenantId, RepositoryId repositoryId, String path, String commitSha) {
+      return new byte[0];
+    }
+
+    @Override
     public void publishStatusCheck(TenantId tenantId, RepositoryId repositoryId, String commitSha,
                                    DecisionOutcome outcome, List<DecisionReason> reasons,
                                    String detailsUrl) {
