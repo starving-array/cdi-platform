@@ -181,6 +181,12 @@ public final class InvestigateRiskHandler {
     // affect the deterministic risk/policy pipeline because its
     // EvidenceOrigin is AGENT_DISCOVERED and its source reference is "CODE_INTELLIGENCE".
     if (codeIntelligence != null) {
+      String content;
+      try {
+        content = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(codeIntelligence);
+      } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        content = "{}";
+      }
       evidence.add(EvidenceRecord.builder()
           .id(EvidenceId.generate())
           .tenantId(tenantId)
@@ -188,18 +194,7 @@ public final class InvestigateRiskHandler {
           .source(new EvidenceSource(SourceType.OTHER, "CODE_INTELLIGENCE"))
           .origin(EvidenceOrigin.AGENT_DISCOVERED)
           .title("InvestigationCodeIntelligence")
-          .content(
-              String.format(
-                  "{\"commitSha\":\"%s\",\"changedFiles\":%s,\"methodSignatures\":%s,\"importedTypes\":%s,\"directCallers\":%s,\"directCallees\":%s,\"impactGraphEdges\":%s,\"dependencyPaths\":%s,\"availabilityStates\":%s}",
-                  codeIntelligence.commitSha(),
-                  codeIntelligence.changedFiles().isEmpty() ? "[]" : codeIntelligence.changedFiles(),
-                  codeIntelligence.changedMethodSignatures().isEmpty() ? "[]" : codeIntelligence.changedMethodSignatures(),
-                  codeIntelligence.importedTypes().isEmpty() ? "[]" : codeIntelligence.importedTypes(),
-                  codeIntelligence.directCallers().isEmpty() ? "[]" : codeIntelligence.directCallers(),
-                  codeIntelligence.directCallees().isEmpty() ? "[]" : codeIntelligence.directCallees(),
-                  codeIntelligence.impactGraphEdges().isEmpty() ? "[]" : codeIntelligence.impactGraphEdges(),
-                  codeIntelligence.dependencyPaths().isEmpty() ? "[]" : codeIntelligence.dependencyPaths(),
-                  codeIntelligence.availabilityStates().isEmpty() ? "[]" : codeIntelligence.availabilityStates()))
+          .content(content)
           .build());
     }
 

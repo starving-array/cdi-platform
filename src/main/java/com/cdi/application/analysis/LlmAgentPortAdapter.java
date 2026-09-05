@@ -148,57 +148,8 @@ public final class LlmAgentPortAdapter implements AgentPort {
           && "InvestigationCodeIntelligence".equals(rec.getTitle())
           && rec.getContent().isPresent()) {
         try {
-          // Parse the JSON content into InvestigationCodeIntelligence
-          // Very light-weight parsing: strip outer braces and split key/value
           String json = rec.getContent().get();
-          if (json.startsWith("{") && json.endsWith("}")) {
-            json = json.substring(1, json.length() - 1);
-            var parts = json.split(",");
-            var fields = new java.util.HashMap<String, String>();
-            for (var part : parts) {
-              var colonIdx = part.indexOf(':');
-              if (colonIdx > 0) {
-                var key = part.substring(0, colonIdx).trim().replace("\"", "");
-                var value = part.substring(colonIdx + 1).trim().replace("\"", "");
-                fields.put(key, value);
-              }
-            }
-            extractedCodeIntelligence = new InvestigationCodeIntelligence(
-                fields.getOrDefault("commitSha", ""),
-                // changedFiles
-                fields.getOrDefault("changedFiles", "[]").isEmpty()
-                    ? List.of()
-                    : List.of(fields.getOrDefault("changedFiles", "[]").replaceAll("\\[", "").replaceAll("\\]", "").split(",")),
-                // methodSignatures
-                fields.getOrDefault("methodSignatures", "[]").isEmpty()
-                    ? List.of()
-                    : List.of(fields.getOrDefault("methodSignatures", "[]").replaceAll("\\[", "").replaceAll("\\]", "").split(",")),
-                // importedTypes
-                fields.getOrDefault("importedTypes", "[]").isEmpty()
-                    ? java.util.Set.of()
-                    : java.util.Set.of(fields.getOrDefault("importedTypes", "[]").replaceAll("\\[", "").replaceAll("\\]", "").split(",")),
-                // directCallers
-                fields.getOrDefault("directCallers", "[]").isEmpty()
-                    ? List.of()
-                    : List.of(fields.getOrDefault("directCallers", "[]").replaceAll("\\[", "").replaceAll("\\]", "").split(",")),
-                // directCallees
-                fields.getOrDefault("directCallees", "[]").isEmpty()
-                    ? List.of()
-                    : List.of(fields.getOrDefault("directCallees", "[]").replaceAll("\\[", "").replaceAll("\\]", "").split(",")),
-                // impactGraphEdges
-                fields.getOrDefault("impactGraphEdges", "[]").isEmpty()
-                    ? List.of()
-                    : List.of(fields.getOrDefault("impactGraphEdges", "[]").replaceAll("\\[", "").replaceAll("\\]", "").split(",")),
-                // dependencyPaths
-                fields.getOrDefault("dependencyPaths", "[]").isEmpty()
-                    ? List.of()
-                    : List.of(fields.getOrDefault("dependencyPaths", "[]").replaceAll("\\[", "").replaceAll("\\]", "").split(",")),
-                // availabilityStates
-                fields.getOrDefault("availabilityStates", "[]").isEmpty()
-                    ? java.util.Set.of()
-                    : java.util.Set.of(fields.getOrDefault("availabilityStates", "[]").replaceAll("\\[", "").replaceAll("\\]", "").split(","))
-            );
-          }
+          extractedCodeIntelligence = new com.fasterxml.jackson.databind.ObjectMapper().readValue(json, InvestigationCodeIntelligence.class);
         } catch (Exception ignored) {
           // Malformed JSON — fall back to null; prompt will show NONE
         }

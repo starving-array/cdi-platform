@@ -13,6 +13,7 @@ import com.cdi.application.decision.GenerateDecisionHandler;
 import com.cdi.common.adapter.out.queue.InProcessJobQueueDispatcher;
 
 @SpringBootTest
+@org.springframework.context.annotation.Import(com.cdi.testconfig.PostgresTestContainerConfiguration.class)
 class ApplicationContextWiringIntegrationTest {
 
   @Autowired

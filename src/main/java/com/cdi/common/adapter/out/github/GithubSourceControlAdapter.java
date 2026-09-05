@@ -24,6 +24,7 @@ import java.util.List;
 
 @Component
 @ConditionalOnExpression("!'${cdi.github.token:}'.isEmpty()")
+@org.springframework.context.annotation.Profile("!test")
 public class GithubSourceControlAdapter implements SourceControlPort {
 
     private final RepositoryRepository repositoryRepository;

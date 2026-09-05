@@ -144,7 +144,7 @@ class OrchestrationChainTest {
     investigateRiskHandler = new InvestigateRiskHandler(
         analysisRunRepository, changeRepository, riskAssessmentRepository,
         agentInvestigationRepository, sourceControlPort, evidenceSearchPort,
-        agentPort, jobQueuePort, eventPublisher, CLOCK);
+        agentPort, jobQueuePort, eventPublisher, CLOCK, new com.cdi.application.analysis.CodeContextAssembler(sourceControlPort));
     evaluatePolicyHandler = new EvaluatePolicyHandler(
         analysisRunRepository, changeRepository, riskAssessmentRepository,
         policyRepository, decisionRecordRepository, sourceControlPort,
