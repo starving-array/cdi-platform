@@ -87,6 +87,30 @@ class GithubSourceControlAdapterTest {
     }
 
     @Test
+    void getChangeMetadata_withOwnerRepoFormat_skipsRepositoryLookup() {
+        RepositoryId customRepoId = RepositoryId.generate();
+        Repository customRepo = new Repository(customRepoId, tenantId, Repository.ProviderType.GITHUB, "starving-array/demo-test", "demo-test", "url", "main", Instant.now());
+        when(repositoryRepository.findByTenantIdAndId(tenantId, customRepoId))
+                .thenReturn(Optional.of(customRepo));
+
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repos/starving-array/demo-test/pulls/42"))
+                .andRespond(MockRestResponseCreators.withSuccess("""
+                        {
+                          "title": "Fix bug",
+                          "body": "Fixed it",
+                          "user": {"login": "alice"},
+                          "head": {"ref": "feature", "sha": "abc1234"},
+                          "base": {"ref": "main"}
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        ChangeMetadata meta = adapter.getChangeMetadata(tenantId, customRepoId, "42");
+        assertEquals("42", meta.providerChangeId());
+        assertEquals("Fix bug", meta.title());
+        mockServer.verify();
+    }
+
+    @Test
     void getDiff_success_parsing() {
         mockServer.expect(MockRestRequestMatchers.requestTo("/repositories/12345"))
                 .andRespond(MockRestResponseCreators.withSuccess("{\"full_name\": \"owner/test-repo\"}", MediaType.APPLICATION_JSON));
@@ -344,4 +368,23 @@ class GithubSourceControlAdapterTest {
         DomainException ex = assertThrows(DomainException.class, () -> adapter.getChangeMetadata(tenantId, repoId, "42"));
         assertTrue(ex.getMessage().contains("Failed to fetch"));
     }
+
+
+    @Test
+    void constructor_setsTimeoutsOnRestTemplate() {
+        org.springframework.boot.web.client.RestTemplateBuilder builder = org.mockito.Mockito.mock(org.springframework.boot.web.client.RestTemplateBuilder.class);
+        org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+
+        org.mockito.Mockito.when(builder.setConnectTimeout(org.mockito.ArgumentMatchers.any())).thenReturn(builder);
+        org.mockito.Mockito.when(builder.setReadTimeout(org.mockito.ArgumentMatchers.any())).thenReturn(builder);
+        org.mockito.Mockito.when(builder.defaultHeader(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString())).thenReturn(builder);
+        org.mockito.Mockito.when(builder.rootUri(org.mockito.ArgumentMatchers.anyString())).thenReturn(builder);
+        org.mockito.Mockito.when(builder.build()).thenReturn(restTemplate);
+
+        new GithubSourceControlAdapter(repositoryRepository, "token", builder);
+
+        org.mockito.Mockito.verify(builder).setConnectTimeout(java.time.Duration.ofSeconds(10));
+        org.mockito.Mockito.verify(builder).setReadTimeout(java.time.Duration.ofSeconds(30));
+    }
+
 }

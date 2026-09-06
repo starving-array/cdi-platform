@@ -48,6 +48,8 @@ public class GithubSourceControlAdapter implements SourceControlPort {
         this.repositoryRepository = repositoryRepository;
         this.objectMapper = objectMapper;
         this.restTemplate = restTemplateBuilder
+                .setConnectTimeout(java.time.Duration.ofSeconds(10))
+                .setReadTimeout(java.time.Duration.ofSeconds(30))
                 .defaultHeader("Authorization", "Bearer " + githubToken)
                 .defaultHeader("Accept", "application/vnd.github.v3+json")
                 .rootUri("https://api.github.com")
@@ -63,8 +65,14 @@ public class GithubSourceControlAdapter implements SourceControlPort {
         if (repo.getProviderType() != Repository.ProviderType.GITHUB) {
             throw new DomainException("Unsupported provider: " + repo.getProviderType());
         }
-        // Fetch full name via /repositories/{id}
         String repoId = repo.getExternalId();
+        
+        // If the external_id is already in "owner/repository" format, use it directly
+        if (repoId != null && repoId.contains("/")) {
+            return repoId;
+        }
+
+        // Fetch full name via /repositories/{id}
         try {
             ResponseEntity<GithubRepoResponse> response = restTemplate.getForEntity(
                     "/repositories/{id}", GithubRepoResponse.class, repoId);
