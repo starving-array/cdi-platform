@@ -349,6 +349,18 @@ class GithubSourceControlAdapterTest {
     }
 
     @Test
+    void publishStatusCheck_includesResponseBodyInException() {
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repositories/12345"))
+                .andRespond(MockRestResponseCreators.withSuccess("{\"full_name\": \"owner/test-repo\"}", MediaType.APPLICATION_JSON));
+
+        mockServer.expect(MockRestRequestMatchers.requestTo("/repos/owner/test-repo/statuses/abc1234"))
+                .andRespond(MockRestResponseCreators.withStatus(HttpStatus.UNPROCESSABLE_ENTITY).body("{\"message\": \"Validation Failed\"}"));
+
+        DomainException ex = assertThrows(DomainException.class, () -> adapter.publishStatusCheck(tenantId, repoId, "abc1234", DecisionOutcome.APPROVE, List.of(), "http://url"));
+        assertTrue(ex.getMessage().contains("422 UNPROCESSABLE_ENTITY - {\"message\": \"Validation Failed\"}"));
+    }
+
+    @Test
     void github404_throwsException() {
         mockServer.expect(MockRestRequestMatchers.requestTo("/repositories/12345"))
                 .andRespond(MockRestResponseCreators.withStatus(HttpStatus.NOT_FOUND));

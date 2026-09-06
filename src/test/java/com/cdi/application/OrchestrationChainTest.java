@@ -151,7 +151,7 @@ class OrchestrationChainTest {
         systemContextPort, policyEngine, jobQueuePort, eventPublisher, CLOCK);
     generateDecisionHandler = new GenerateDecisionHandler(
         analysisRunRepository, changeRepository, decisionRecordRepository,
-        sourceControlPort, Clock.fixed(NOW, java.time.ZoneId.of("UTC")));
+        sourceControlPort, Clock.fixed(NOW, java.time.ZoneId.of("UTC")), "http://localhost:5173");
 
     // A permissive tenant policy so EvaluatePolicy can always reach APPROVE.
     policyRepository.policy = approveAllPolicy();

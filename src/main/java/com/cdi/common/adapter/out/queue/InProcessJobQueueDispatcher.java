@@ -110,7 +110,7 @@ public class InProcessJobQueueDispatcher implements JobQueuePort {
 
     return jobId;
   }
-  
+
   private boolean isRetryable(Throwable t) {
     if (t instanceof ApplicationException ae) {
       return ae.getError().retryable();
@@ -118,14 +118,14 @@ public class InProcessJobQueueDispatcher implements JobQueuePort {
     // General runtime exceptions or port exceptions could be transient.
     return true;
   }
-  
+
   private void handleTerminalFailure(String commandName, Object payload, Throwable t) {
     AnalysisRunId runId = extractRunId(payload);
     String analysisRunIdStr = runId != null ? runId.value().toString() : "unknown";
-    
-    log.error("Unhandled error processing job '{}' with payload [{}], analysisRunId={}. Exception Type: {}. Full Stack Trace:", 
+
+    log.error("Unhandled error processing job '{}' with payload [{}], analysisRunId={}. Exception Type: {}. Full Stack Trace:",
         commandName, payload, analysisRunIdStr, t.getClass().getName(), t);
-        
+
     if (runId != null && analysisRunRepositoryProvider != null) {
       AnalysisRunRepository repo = analysisRunRepositoryProvider.getIfAvailable();
       if (repo != null) {
@@ -133,10 +133,17 @@ public class InProcessJobQueueDispatcher implements JobQueuePort {
           Optional<AnalysisRunContext> ctx = repo.findById(runId);
           if (ctx.isPresent()) {
             AnalysisRun run = ctx.get().run();
+
+            // The DB schema for failure_code is VARCHAR(255). We must truncate the exception message.
+            String failureMessage = t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName();
+            if (failureMessage.length() > 255) {
+                failureMessage = failureMessage.substring(0, 252) + "...";
+            }
+
             // Mark the run as failed so it can be safely retried via RequestAnalysis
             run.fail(new AnalysisFailure(
                 AnalysisFailure.FailureCategory.ANALYSIS_FAILED,
-                t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName(),
+                failureMessage,
                 Instant.now()
             ));
             repo.save(ctx.get().tenantId(), run);
@@ -148,7 +155,7 @@ public class InProcessJobQueueDispatcher implements JobQueuePort {
       }
     }
   }
-  
+
   private AnalysisRunId extractRunId(Object payload) {
     if (payload instanceof EvaluatePolicyCommand cmd) return cmd.analysisRunId();
     if (payload instanceof InvestigateRiskCommand cmd) return cmd.analysisRunId();

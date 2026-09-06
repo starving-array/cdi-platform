@@ -240,7 +240,7 @@ public class GithubSourceControlAdapter implements SourceControlPort {
             restTemplate.postForEntity(
                     "/repos/{owner}/{repo}/statuses/{sha}", request, Void.class, parts[0], parts[1], commitSha);
         } catch (RestClientResponseException e) {
-            throw new DomainException("Failed to publish status to GitHub: " + e.getStatusCode());
+            throw new DomainException("Failed to publish status to GitHub: " + e.getStatusCode() + " - " + e.getResponseBodyAsString());
         }
     }
     // --- DTOs ---

@@ -176,4 +176,35 @@ class InProcessJobQueueDispatcherUnitTest {
 
     await().atMost(3, TimeUnit.SECONDS).untilTrue(successExecuted);
   }
+
+  @Test
+  void terminalFailure_truncatesLongExceptionMessages() {
+    AnalysisRunId runId = AnalysisRunId.generate();
+    com.cdi.common.domain.id.TenantId tenantId = com.cdi.common.domain.id.TenantId.generate();
+    com.cdi.analysis.domain.CodeSnapshot snap = new com.cdi.analysis.domain.CodeSnapshot("sha", "branch");
+    com.cdi.analysis.domain.AnalysisRun run = new com.cdi.analysis.domain.AnalysisRun(runId, com.cdi.common.domain.id.ChangeId.generate(), snap, java.time.Instant.now());
+
+    com.cdi.application.port.out.AnalysisRunRepository analysisRunRepository = mock(com.cdi.application.port.out.AnalysisRunRepository.class);
+    ObjectProvider<com.cdi.application.port.out.AnalysisRunRepository> provider = mock(ObjectProvider.class);
+    when(provider.getIfAvailable()).thenReturn(analysisRunRepository);
+
+    InProcessJobQueueDispatcher customDispatcher = new InProcessJobQueueDispatcher(
+        analyzeProvider, investigateProvider, evaluateProvider, generateProvider,
+        provider, executor);
+
+    when(analysisRunRepository.findById(runId)).thenReturn(java.util.Optional.of(new com.cdi.application.port.out.AnalysisRunContext(tenantId, run)));
+
+    String longMessage = "a".repeat(300);
+    org.mockito.Mockito.doThrow(new RuntimeException(longMessage))
+        .when(analyzeChangeHandler).handle(org.mockito.ArgumentMatchers.any());
+
+    customDispatcher.enqueue("AnalyzeChangeCommand", new AnalyzeChangeCommand(runId), new IdempotencyKey("k-fail-long"));
+
+    await().atMost(5, TimeUnit.SECONDS).until(() -> run.getStatus() == com.cdi.analysis.domain.AnalysisRun.Status.FAILED);
+
+    assertTrue(run.getFailureInfo().isPresent());
+    String failureCode = run.getFailureInfo().get().failureCode();
+    assertTrue(failureCode.length() <= 255);
+    assertTrue(failureCode.endsWith("..."));
+  }
 }

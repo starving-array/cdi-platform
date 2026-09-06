@@ -255,9 +255,10 @@ public class WebAdapterApplicationConfiguration {
       AnalysisRunRepository analysisRunRepository,
       ChangeRepository changeRepository,
       DecisionRecordRepository decisionRecordRepository,
-      SourceControlPort sourceControlPort) {
+      SourceControlPort sourceControlPort,
+      @org.springframework.beans.factory.annotation.Value("${cdi.ui.base-url:http://localhost:5173}") String uiBaseUrl) {
     return new com.cdi.application.decision.GenerateDecisionHandler(
         analysisRunRepository, changeRepository, decisionRecordRepository,
-        sourceControlPort, Clock.systemUTC());
+        sourceControlPort, Clock.systemUTC(), uiBaseUrl);
   }
 }

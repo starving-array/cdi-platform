@@ -71,7 +71,8 @@ class GenerateDecisionHandlerTest {
         changeRepository,
         decisionRecordRepository,
         sourceControlPort,
-        java.time.Clock.fixed(NOW, java.time.ZoneId.of("UTC")));
+        java.time.Clock.fixed(NOW, java.time.ZoneId.of("UTC")),
+        "http://localhost:5173");
   }
 
   @Test
@@ -87,7 +88,7 @@ class GenerateDecisionHandlerTest {
     assertEquals(COMMIT_SHA, call.commitSha);
     assertEquals(DecisionOutcome.BLOCK, call.outcome);
     assertEquals(List.of("cap"), call.reasons.stream().map(DecisionReason::ruleId).toList());
-    assertEquals("/runs/" + runId.value() + "/decision", call.detailsUrl);
+    assertEquals("http://localhost:5173/runs/" + runId.value() + "/decision", call.detailsUrl);
   }
 
   @Test

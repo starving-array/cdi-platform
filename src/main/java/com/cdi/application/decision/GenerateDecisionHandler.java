@@ -62,13 +62,15 @@ public final class GenerateDecisionHandler {
   private final DecisionRecordRepository decisionRecordRepository;
   private final SourceControlPort sourceControlPort;
   private final java.time.Clock clock;
+  private final String baseUiUrl;
 
   public GenerateDecisionHandler(
       AnalysisRunRepository analysisRunRepository,
       ChangeRepository changeRepository,
       DecisionRecordRepository decisionRecordRepository,
       SourceControlPort sourceControlPort,
-      java.time.Clock clock) {
+      java.time.Clock clock,
+      String baseUiUrl) {
     this.analysisRunRepository =
         Objects.requireNonNull(analysisRunRepository, "AnalysisRunRepository");
     this.changeRepository = Objects.requireNonNull(changeRepository, "ChangeRepository");
@@ -76,6 +78,7 @@ public final class GenerateDecisionHandler {
         Objects.requireNonNull(decisionRecordRepository, "DecisionRecordRepository");
     this.sourceControlPort = Objects.requireNonNull(sourceControlPort, "SourceControlPort");
     this.clock = Objects.requireNonNull(clock, "Clock");
+    this.baseUiUrl = baseUiUrl != null ? baseUiUrl : "http://localhost:5173";
   }
 
   /**
@@ -126,6 +129,6 @@ public final class GenerateDecisionHandler {
   }
 
   private String detailsUrl(AnalysisRun run) {
-    return "/runs/" + run.getId().value() + "/decision";
+    return baseUiUrl + "/runs/" + run.getId().value() + "/decision";
   }
 }
