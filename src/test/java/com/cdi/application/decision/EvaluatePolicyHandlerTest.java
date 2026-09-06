@@ -503,6 +503,12 @@ class EvaluatePolicyHandlerTest {
   }
 
   private static class FakeSourceControlPort implements SourceControlPort {
+
+    @Override
+    public java.util.List<String> listFiles(com.cdi.common.domain.id.TenantId tenantId, com.cdi.common.domain.id.RepositoryId repositoryId, String commitSha) {
+        return java.util.List.of();
+    }
+
     List<FileDiff> diff = List.of();
 
     @Override
@@ -574,3 +580,4 @@ class EvaluatePolicyHandlerTest {
     }
   }
 }
+

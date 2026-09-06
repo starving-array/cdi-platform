@@ -99,9 +99,9 @@ class InProcessJobQueueDispatcherUnitTest {
     org.mockito.Mockito.doAnswer(inv -> {
       called.set(true);
       return null;
-    }).when(investigateRiskHandler).handle(new InvestigateRiskCommand(runId));
+    }).when(investigateRiskHandler).handle(new InvestigateRiskCommand(runId, null));
 
-    JobId jobId = dispatcher.enqueue("InvestigateRiskCommand", new InvestigateRiskCommand(runId), new IdempotencyKey("k2"));
+    JobId jobId = dispatcher.enqueue("InvestigateRiskCommand", new InvestigateRiskCommand(runId, null), new IdempotencyKey("k2"));
     assertNotNull(jobId);
 
     await().atMost(3, TimeUnit.SECONDS).untilTrue(called);

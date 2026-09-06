@@ -13,7 +13,11 @@ import java.util.List;
  * HEAD. Changed files compose the existing {@link FileDiff} VO rather than
  * duplicating path/additions/deletions/changeType/patch.
  */
-public record CodeContext(String commitSha, List<ChangedFileSource> changedFiles) {
+public record CodeContext(String commitSha, List<ChangedFileSource> changedFiles, CoverageState coverageState) {
+
+  public CodeContext(String commitSha, List<ChangedFileSource> changedFiles) {
+    this(commitSha, changedFiles, CoverageState.FULL);
+  }
 
   public CodeContext {
     if (commitSha == null || commitSha.isBlank()) {

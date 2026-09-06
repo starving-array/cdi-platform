@@ -38,6 +38,8 @@ public interface SourceControlPort {
    * therefore handled safely. A missing file, a directory path, or unusable
    * content is surfaced as a domain exception from the adapter.
    */
+  List<String> listFiles(TenantId tenantId, RepositoryId repositoryId, String commitSha);
+
   byte[] getFileContent(TenantId tenantId, RepositoryId repositoryId, String path, String commitSha);
 
   void publishStatusCheck(

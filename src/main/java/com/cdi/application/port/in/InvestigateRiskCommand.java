@@ -11,7 +11,7 @@ import com.cdi.common.domain.id.AnalysisRunId;
  * continues to deterministic policy evaluation regardless of whether the
  * investigation succeeded or degraded to deterministic-only risk.
  */
-public record InvestigateRiskCommand(AnalysisRunId analysisRunId) {
+public record InvestigateRiskCommand(AnalysisRunId analysisRunId, com.cdi.application.analysis.InvestigationCodeIntelligence codeIntelligence) {
 
   public InvestigateRiskCommand {
     if (analysisRunId == null) {

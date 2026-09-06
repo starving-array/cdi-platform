@@ -21,7 +21,9 @@ public record InvestigationCodeIntelligence(
         List<String> directCallees,
         List<String> impactGraphEdges,
         List<String> dependencyPaths,
-        Set<String> availabilityStates) {
+        Set<String> availabilityStates,
+        int downstreamImpact,
+        int maxTraversalDepth) {
 
     public InvestigationCodeIntelligence {
         changedFiles = changedFiles == null ? List.of() : List.copyOf(changedFiles);

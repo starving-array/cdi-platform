@@ -14,7 +14,11 @@ public record ImpactSummary(
     int unresolvedRelationships,
     int repositoryLocalRelationships,
     int externalRelationships,
-    String commitSha) {
+    String commitSha, com.cdi.analysis.domain.CoverageState coverageState) {
+
+  public ImpactSummary(int changedMembers, int directlyAffectedMembers, int transitivelyAffectedMembers, int maxTraversalDepth, int unresolvedRelationships, int repositoryLocalRelationships, int externalRelationships, String commitSha) {
+    this(changedMembers, directlyAffectedMembers, transitivelyAffectedMembers, maxTraversalDepth, unresolvedRelationships, repositoryLocalRelationships, externalRelationships, commitSha, com.cdi.analysis.domain.CoverageState.FULL);
+  }
 
   public ImpactSummary {
     changedMembers = Math.max(changedMembers, 0);
@@ -28,7 +32,7 @@ public record ImpactSummary(
 
   /** Default summary with all zeros (no impact). */
   public static ImpactSummary empty() {
-    return new ImpactSummary(0, 0, 0, 0, 0, 0, 0, null);
+    return new ImpactSummary(0, 0, 0, 0, 0, 0, 0, null, com.cdi.analysis.domain.CoverageState.FULL);
   }
 
   /** Build a summary with the given commit SHA. */
@@ -36,7 +40,7 @@ public record ImpactSummary(
     return new ImpactSummary(changedMembers, directlyAffectedMembers,
         transitivelyAffectedMembers, maxTraversalDepth,
         unresolvedRelationships, repositoryLocalRelationships,
-        externalRelationships, sha);
+        externalRelationships, sha, coverageState);
   }
 
   /** Returns the commit SHA, or null if none set. */

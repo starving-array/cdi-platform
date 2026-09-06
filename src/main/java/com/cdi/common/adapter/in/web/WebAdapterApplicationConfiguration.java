@@ -127,8 +127,12 @@ public class WebAdapterApplicationConfiguration {
         return new ChangeMetadata(providerChangeId, "dummy title", "dummy desc", "dummy author", "feature-branch", "main", "dummySha");
       }
       @Override
-      public List<FileDiff> getDiff(TenantId tenantId, RepositoryId repositoryId, String commitSha) {
-        return List.of();
+      public java.util.List<FileDiff> getDiff(TenantId tenantId, RepositoryId repositoryId, String commitSha) {
+        return java.util.List.of();
+      }
+      @Override
+      public java.util.List<String> listFiles(TenantId tenantId, RepositoryId repositoryId, String commitSha) {
+        return java.util.List.of();
       }
       @Override
       public byte[] getFileContent(TenantId tenantId, RepositoryId repositoryId, String path, String commitSha) {
@@ -211,7 +215,7 @@ public class WebAdapterApplicationConfiguration {
     return new com.cdi.application.analysis.AnalyzeChangeHandler(
         changeRepository, analysisRunRepository, riskAssessmentRepository,
         sourceControlPort, systemContextPort, evidenceSearchPort, jobQueuePort,
-        domainEventPublisher, deterministicRiskEngine);
+        domainEventPublisher, deterministicRiskEngine, codeContextAssembler);
   }
 
   @Bean

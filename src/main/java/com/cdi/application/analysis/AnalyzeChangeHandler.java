@@ -87,6 +87,7 @@ public final class AnalyzeChangeHandler {
   private final DomainEventPublisher eventPublisher;
   private final DeterministicRiskEngine riskEngine;
   private final Clock clock;
+  private final CodeContextAssembler codeContextAssembler;
 
   /**
    * Creates the handler with explicit dependencies and a time source.
@@ -101,6 +102,7 @@ public final class AnalyzeChangeHandler {
       JobQueuePort jobQueuePort,
       DomainEventPublisher eventPublisher,
       DeterministicRiskEngine riskEngine,
+      CodeContextAssembler codeContextAssembler,
       Clock clock) {
     this.changeRepository = Objects.requireNonNull(changeRepository, "ChangeRepository");
     this.analysisRunRepository = Objects.requireNonNull(analysisRunRepository, "AnalysisRunRepository");
@@ -111,6 +113,7 @@ public final class AnalyzeChangeHandler {
     this.jobQueuePort = Objects.requireNonNull(jobQueuePort, "JobQueuePort");
     this.eventPublisher = Objects.requireNonNull(eventPublisher, "DomainEventPublisher");
     this.riskEngine = Objects.requireNonNull(riskEngine, "DeterministicRiskEngine");
+    this.codeContextAssembler = Objects.requireNonNull(codeContextAssembler, "CodeContextAssembler");
     this.clock = Objects.requireNonNull(clock, "Clock");
   }
 
@@ -126,10 +129,11 @@ public final class AnalyzeChangeHandler {
       EvidenceSearchPort evidenceSearchPort,
       JobQueuePort jobQueuePort,
       DomainEventPublisher eventPublisher,
-      DeterministicRiskEngine riskEngine) {
+      DeterministicRiskEngine riskEngine,
+      CodeContextAssembler codeContextAssembler) {
     this(changeRepository, analysisRunRepository, riskAssessmentRepository,
         sourceControlPort, systemContextPort, evidenceSearchPort,
-        jobQueuePort, eventPublisher, riskEngine, Clock.systemUTC());
+        jobQueuePort, eventPublisher, riskEngine, codeContextAssembler, Clock.systemUTC());
   }
 
   /**
@@ -172,7 +176,58 @@ public final class AnalyzeChangeHandler {
 
     CriticalityTier criticality = resolveCriticality(tenantId, change, diff);
     Evidence evidence = resolveEvidence(tenantId, diff);
-    List<String> paths = diff.stream().map(FileDiff::path).toList();
+
+    // Perform Repository Intelligence / Impact Analysis
+    com.cdi.analysis.domain.CodeContext codeContext = codeContextAssembler.assemble(
+        tenantId, change.getRepositoryId(), run.getCodeSnapshot().commitSha(), diff, 2);
+    
+    com.cdi.analysis.domain.parsing.DependencyAnalysis dependencyAnalysis = 
+        new com.cdi.analysis.domain.parsing.JavaDependencyAnalyzer().analyze(codeContext);
+        
+    com.cdi.analysis.domain.parsing.ImpactGraphResult impactGraphResult = 
+        new com.cdi.analysis.domain.parsing.ImpactGraph(dependencyAnalysis).build();
+        
+    int downstreamImpact = impactGraphResult.summary.transitivelyAffectedMembers();
+
+    // Collect metrics for intelligence
+    List<String> changedMethodSignatures = new java.util.ArrayList<>();
+    java.util.Set<String> importedTypes = new java.util.HashSet<>();
+    java.util.Set<String> availabilityStates = new java.util.HashSet<>();
+    availabilityStates.add("COVERAGE_" + codeContext.coverageState().name());
+    for (com.cdi.analysis.domain.ChangedFileSource cfs : codeContext.changedFiles()) {
+        availabilityStates.add(cfs.availability().name());
+    }
+    for (com.cdi.analysis.domain.parsing.JavaFileChange fileChange : new com.cdi.analysis.domain.parsing.JavaChangeAnalyzer().analyze(codeContext).files()) {
+      importedTypes.addAll(fileChange.imports());
+      for (com.cdi.analysis.domain.parsing.TypeChange type : fileChange.types()) {
+        for (com.cdi.analysis.domain.parsing.MemberChange m : type.methods()) {
+          if (m.changed()) changedMethodSignatures.add(type.name() + "." + m.name());
+        }
+      }
+    }
+    List<String> directCallers = new java.util.ArrayList<>();
+    List<String> directCallees = new java.util.ArrayList<>();
+    List<String> impactGraphEdges = new java.util.ArrayList<>();
+    for (com.cdi.analysis.domain.parsing.ImpactGraphEdge e : impactGraphResult.edges) {
+        impactGraphEdges.add(e.sourceMember() + " " + e.edgeType() + " " + e.targetMember());
+        if ("CALLED_BY".equals(e.edgeType())) directCallers.add(e.targetMember());
+        if ("CALLS".equals(e.edgeType())) directCallees.add(e.targetMember());
+    }
+    List<String> dependencyPaths = new java.util.ArrayList<>();
+    
+    InvestigationCodeIntelligence intelligence = new InvestigationCodeIntelligence(
+        run.getCodeSnapshot().commitSha(),
+        diff.stream().map(FileDiff::path).toList(),
+        changedMethodSignatures,
+        importedTypes,
+        directCallers,
+        directCallees,
+        impactGraphEdges,
+        dependencyPaths,
+        availabilityStates,
+        downstreamImpact,
+        impactGraphResult.summary.maxTraversalDepth()
+    );
 
     RiskAssessmentInput input = new RiskAssessmentInput(
         diff.size(),
@@ -181,14 +236,14 @@ public final class AnalyzeChangeHandler {
         isDatabaseMigration(diff),
         isConfigurationChange(diff),
         criticality,
-        0,
+        downstreamImpact,
         evidence.state(),
         evidence.matchedIncidentIds());
 
     RiskAssessment assessment = riskEngine.assess(run.getId(), input, now);
     riskAssessmentRepository.save(tenantId, assessment);
 
-    enqueueNextStage(tenantId, run, assessment, criticality);
+    enqueueNextStage(tenantId, run, assessment, criticality, intelligence);
 
     publish(RiskAssessed.create(tenantId, run.getId(), change.getId(),
         assessment.getId(), assessment.getLevel()));
@@ -197,22 +252,24 @@ public final class AnalyzeChangeHandler {
 
   /**
    * Routes the completed run to the next workflow stage per
-   * analysis-workflow.md §5 / application-layer.md §13: high-risk or Tier-0
+   * analysis-workflow.md 5 / application-layer.md 13: high-risk or Tier-0
    * changes investigate via the agent (InvestigateRisk) before policy
    * evaluation; everything else goes straight to deterministic policy
    * evaluation (EvaluatePolicy). The "evidence conflict" and "explicit
-   * manual request" triggers named in §5 are not modeled in the current
+   * manual request" triggers named in 5 are not modeled in the current
    * evidence state enum nor in the worker-only payload (the
    * {@code AnalyzeChangeCommand} carries only the run id), so they remain a
-   * future seam — mirroring the dormant {@code HIGH_DEPENDENCY_IMPACT} factor.
+   * TODO.
+   *
+   * <p>The condition must exactly match the documented risk thresholds.
    * No new business rule: the two implemented triggers are taken verbatim
    * from the authoritative workflow.
    */
   private void enqueueNextStage(
-      TenantId tenantId, AnalysisRun run, RiskAssessment assessment, CriticalityTier criticality) {
+      TenantId tenantId, AnalysisRun run, RiskAssessment assessment, CriticalityTier criticality, InvestigationCodeIntelligence intelligence) {
     IdempotencyKey key = new IdempotencyKey(tenantId.value() + ":" + run.getId().value());
     if (requiresInvestigation(assessment, criticality)) {
-      jobQueuePort.enqueue("InvestigateRiskCommand", new InvestigateRiskCommand(run.getId()), key);
+      jobQueuePort.enqueue("InvestigateRiskCommand", new InvestigateRiskCommand(run.getId(), intelligence), key);
     } else {
       jobQueuePort.enqueue("EvaluatePolicyCommand", new EvaluatePolicyCommand(run.getId()), key);
     }

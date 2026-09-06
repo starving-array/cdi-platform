@@ -91,10 +91,13 @@ class AnalyzeChangeHandlerTest {
     evidenceSearchPort = new FakeEvidenceSearchPort();
     jobQueuePort = new FakeJobQueuePort();
     eventPublisher = new FakeDomainEventPublisher();
+    com.cdi.application.analysis.CodeContextAssembler mockAssembler = org.mockito.Mockito.mock(com.cdi.application.analysis.CodeContextAssembler.class);
+    org.mockito.Mockito.when(mockAssembler.assemble(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(2)))
+        .thenReturn(new com.cdi.analysis.domain.CodeContext("sha", java.util.List.of()));
     handler = new AnalyzeChangeHandler(
         changeRepository, analysisRunRepository, riskAssessmentRepository,
         sourceControlPort, systemContextPort, evidenceSearchPort,
-        jobQueuePort, eventPublisher, new DeterministicRiskEngine(), CLOCK);
+        jobQueuePort, eventPublisher, new DeterministicRiskEngine(), mockAssembler, CLOCK);
   }
 
   @Test
@@ -586,6 +589,7 @@ class AnalyzeChangeHandlerTest {
   }
 
   private class FakeSourceControlPort implements SourceControlPort {
+    @Override public java.util.List<String> listFiles(com.cdi.common.domain.id.TenantId t, com.cdi.common.domain.id.RepositoryId r, String c) { return java.util.List.of(); }
     List<FileDiff> diff = List.of();
     boolean failGetDiff;
 
@@ -698,3 +702,4 @@ class AnalyzeChangeHandlerTest {
     }
   }
 }
+

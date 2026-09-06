@@ -49,13 +49,121 @@ public final class CodeContextAssembler {
    * Builds the code context for {@code commitSha} from the diff. The exact
    * requested SHA is passed to every retrieval — never a branch or HEAD.
    */
-  public CodeContext assemble(TenantId tenantId, RepositoryId repositoryId,
-                              String commitSha, List<FileDiff> diff) {
-    List<ChangedFileSource> files = new ArrayList<>();
-    for (FileDiff fileDiff : (diff == null ? List.<FileDiff>of() : diff)) {
+  public CodeContext assemble(TenantId tenantId, RepositoryId repositoryId, String commitSha, java.util.List<FileDiff> diff) {
+      return assemble(tenantId, repositoryId, commitSha, diff, 0);
+  }
+
+  public CodeContext assemble(TenantId tenantId, RepositoryId repositoryId, String commitSha, java.util.List<FileDiff> diff, int maxDepth) {
+    java.util.List<ChangedFileSource> files = new ArrayList<>();
+    Set<String> processedPaths = new java.util.HashSet<>();
+
+    for (FileDiff fileDiff : (diff == null ? java.util.List.<FileDiff>of() : diff)) {
       files.add(resolve(tenantId, repositoryId, commitSha, fileDiff));
+      processedPaths.add(fileDiff.path());
     }
-    return new CodeContext(commitSha, files);
+
+    if (maxDepth > 0) {
+      String sourceRoot = discoverSourceRoot(processedPaths);
+      java.util.List<ChangedFileSource> currentLayer = new ArrayList<>(files);
+
+      for (int depth = 0; depth < maxDepth; depth++) {
+        Set<String> nextPaths = new java.util.HashSet<>();
+        for (ChangedFileSource file : currentLayer) {
+          if (file.availability() == ChangedFileSource.Availability.RETRIEVED && file.path().endsWith(".java")) {
+            String content = new String(file.contentOptional().orElse(new byte[0]), java.nio.charset.StandardCharsets.UTF_8);
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("import\\s+([a-zA-Z0-9_.]+);").matcher(content);
+            while (m.find()) {
+              String imported = m.group(1);
+              String p = sourceRoot + imported.replace('.', '/') + ".java";
+              if (!processedPaths.contains(p)) {
+                nextPaths.add(p);
+              }
+            }
+          }
+        }
+
+        if (nextPaths.isEmpty()) break;
+
+        currentLayer = new ArrayList<>();
+        for (String p : nextPaths) {
+          processedPaths.add(p);
+          FileDiff unmodifiedDiff = new FileDiff(p, 0, 0, FileDiff.ChangeType.UNMODIFIED);
+          ChangedFileSource fetched = resolve(tenantId, repositoryId, commitSha, unmodifiedDiff);
+          files.add(fetched);
+          currentLayer.add(fetched);
+        }
+      }
+    }
+
+    // Downstream caller discovery (bounded repository scan)
+    int MAX_CANDIDATE_FILES = 500;
+    int MAX_PARSED_FILES = 50;
+    long MAX_DOWNLOAD_BYTES = 5 * 1024 * 1024; // 5 MB
+
+    int candidateFilesScanned = 0;
+    int parsedFilesAdded = 0;
+    long downloadedBytes = 0;
+    com.cdi.analysis.domain.CoverageState coverage = com.cdi.analysis.domain.CoverageState.FULL;
+
+    Set<String> changedClassNames = new java.util.HashSet<>();
+    for (FileDiff fileDiff : (diff == null ? java.util.List.<FileDiff>of() : diff)) {
+        if (fileDiff.path().endsWith(".java")) {
+            String name = fileDiff.path().substring(fileDiff.path().lastIndexOf('/') + 1);
+            if (name.endsWith(".java")) name = name.substring(0, name.length() - 5);
+            changedClassNames.add(name);
+        }
+    }
+
+    if (!changedClassNames.isEmpty()) {
+        try {
+          java.util.List<String> allPaths = sourceControlPort.listFiles(tenantId, repositoryId, commitSha);
+          for (String p : allPaths) {
+            if (!p.endsWith(".java") || processedPaths.contains(p)) continue;
+            
+            if (candidateFilesScanned >= MAX_CANDIDATE_FILES || downloadedBytes >= MAX_DOWNLOAD_BYTES || parsedFilesAdded >= MAX_PARSED_FILES) {
+                coverage = com.cdi.analysis.domain.CoverageState.PARTIAL;
+                break;
+            }
+            
+            FileDiff unmodifiedDiff = new FileDiff(p, 0, 0, FileDiff.ChangeType.UNMODIFIED);
+            ChangedFileSource fetched = resolve(tenantId, repositoryId, commitSha, unmodifiedDiff);
+            candidateFilesScanned++;
+            
+            if (fetched.availability() == ChangedFileSource.Availability.RETRIEVED) {
+                byte[] contentBytes = fetched.contentOptional().orElse(new byte[0]);
+                downloadedBytes += contentBytes.length;
+                String contentStr = new String(contentBytes, java.nio.charset.StandardCharsets.UTF_8);
+                
+                boolean isCandidate = false;
+                for (String className : changedClassNames) {
+                    if (contentStr.contains(className)) {
+                        isCandidate = true;
+                        break;
+                    }
+                }
+                
+                if (isCandidate) {
+                    files.add(fetched);
+                    processedPaths.add(p);
+                    parsedFilesAdded++;
+                }
+            }
+          }
+        } catch (Exception e) {
+            coverage = com.cdi.analysis.domain.CoverageState.PARTIAL;
+        }
+    }
+
+    return new CodeContext(commitSha, files, coverage);
+  }
+
+  private String discoverSourceRoot(Set<String> paths) {
+    for (String p : paths) {
+      if (p.endsWith(".java") && p.contains("src/main/java/")) {
+        return p.substring(0, p.indexOf("src/main/java/") + "src/main/java/".length());
+      }
+    }
+    return "src/main/java/";
   }
 
   private ChangedFileSource resolve(TenantId tenantId, RepositoryId repositoryId,
@@ -88,3 +196,8 @@ public final class CodeContextAssembler {
     return NON_TEXTUAL_EXTENSIONS.contains(path.substring(idx + 1).toLowerCase(Locale.ROOT));
   }
 }
+
+
+
+
+

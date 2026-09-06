@@ -18,7 +18,8 @@ public record FileDiff(String path, int additions, int deletions, ChangeType cha
   public enum ChangeType {
     ADDED,
     MODIFIED,
-    DELETED
+    DELETED,
+    UNMODIFIED
   }
 
   /**

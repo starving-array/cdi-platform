@@ -137,10 +137,13 @@ class OrchestrationChainTest {
     DeterministicRiskEngine riskEngine = new DeterministicRiskEngine();
     PolicyEngine policyEngine = new PolicyEngine();
 
+    com.cdi.application.analysis.CodeContextAssembler mockAssembler = org.mockito.Mockito.mock(com.cdi.application.analysis.CodeContextAssembler.class);
+    org.mockito.Mockito.when(mockAssembler.assemble(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(2)))
+        .thenReturn(new com.cdi.analysis.domain.CodeContext("sha", java.util.List.of()));
     analyzeChangeHandler = new AnalyzeChangeHandler(
         changeRepository, analysisRunRepository, riskAssessmentRepository,
         sourceControlPort, systemContextPort, evidenceSearchPort,
-        jobQueuePort, eventPublisher, riskEngine, CLOCK);
+        jobQueuePort, eventPublisher, riskEngine, mockAssembler, CLOCK);
     investigateRiskHandler = new InvestigateRiskHandler(
         analysisRunRepository, changeRepository, riskAssessmentRepository,
         agentInvestigationRepository, sourceControlPort, evidenceSearchPort,
@@ -185,7 +188,7 @@ class OrchestrationChainTest {
     completedRunWithRisk(RiskLevel.MEDIUM, CriticalityTier.TIER_3);
     agentPort.output = new InvestigationFindings(List.of());
 
-    investigateRiskHandler.handle(new InvestigateRiskCommand(runId));
+    investigateRiskHandler.handle(new InvestigateRiskCommand(runId, null));
 
     assertEquals(AgentInvestigation.Status.COMPLETED,
         agentInvestigationRepository.saved.get(0).getStatus());
@@ -333,7 +336,7 @@ class OrchestrationChainTest {
   private void driveChain() {
     analyzeChangeHandler.handle(new AnalyzeChangeCommand(runId));
     if (endsWith("InvestigateRiskCommand")) {
-      investigateRiskHandler.handle(new InvestigateRiskCommand(runId));
+      investigateRiskHandler.handle(new InvestigateRiskCommand(runId, null));
     }
     if (endsWith("EvaluatePolicyCommand")) {
       evaluatePolicyHandler.handle(new EvaluatePolicyCommand(runId));
@@ -560,6 +563,7 @@ class OrchestrationChainTest {
   }
 
   private static class FakeSourceControlPort implements SourceControlPort {
+    @Override public java.util.List<String> listFiles(com.cdi.common.domain.id.TenantId t, com.cdi.common.domain.id.RepositoryId r, String c) { return java.util.List.of(); }
     List<FileDiff> diff = List.of();
     final List<StatusCall> statusChecks = new ArrayList<>();
 
@@ -671,3 +675,4 @@ class OrchestrationChainTest {
     }
   }
 }
+

@@ -154,8 +154,37 @@ public class GithubSourceControlAdapter implements SourceControlPort {
         }
     }
 
-    /**
-     * Retrieves one file's raw bytes from the GitHub Contents API at the
+    @Override
+  public java.util.List<String> listFiles(TenantId tenantId, RepositoryId repositoryId, String commitSha) {
+      if (commitSha == null || commitSha.isBlank()) {
+          throw new DomainException("Commit SHA cannot be blank");
+      }
+      Repository repo = getRepository(tenantId, repositoryId);
+      String fullName = getFullName(repo);
+      String[] parts = fullName.split("/");
+      if (parts.length != 2) throw new DomainException("Invalid repository full name");
+
+      try {
+          ResponseEntity<GithubTreeResponse> response = restTemplate.getForEntity(
+                  "/repos/{owner}/{repo}/git/trees/{sha}?recursive=1", GithubTreeResponse.class,
+                  parts[0], parts[1], commitSha.trim());
+          if (response.getBody() == null || response.getBody().tree() == null) {
+              return java.util.List.of();
+          }
+          return response.getBody().tree().stream()
+                  .filter(item -> "blob".equals(item.type()) || "tree".equals(item.type()))
+                  .map(GithubTreeItem::path)
+                  .toList();
+      } catch (RestClientResponseException e) {
+          if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+              throw new DomainException("Tree not found at exact SHA: " + commitSha);
+          }
+          throw new com.cdi.application.common.error.PortException(com.cdi.application.common.error.PortType.SOURCE_CONTROL, false, "Failed to list files: " + e.getStatusCode());
+      }
+  }
+
+  /**
+   * Retrieves one file's raw bytes from the GitHub Contents API at the
      * EXACT requested commit. The SHA is sent as {@code ?ref=<sha>}; on any
      * failure (404, directory path, unsupported encoding) a
      * {@link DomainException} is thrown — no fallback ref is ever attempted.
@@ -255,4 +284,6 @@ public class GithubSourceControlAdapter implements SourceControlPort {
     record GithubCommitResponse(List<GithubFile> files) {}
 
     record GithubStatusRequest(String state, String target_url, String description, String context) {}
+    record GithubTreeItem(String path, String type) {}
+    record GithubTreeResponse(java.util.List<GithubTreeItem> tree, boolean truncated) {}
 }

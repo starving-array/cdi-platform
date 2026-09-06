@@ -85,7 +85,9 @@ class LlmAgentPortAdapterTest {
             List.of(),
             List.of(),
             List.of(),
-            java.util.Set.of()
+            java.util.Set.of(),
+            0,
+            0
         );
         adapter.setCodeIntelligence(intel);
             

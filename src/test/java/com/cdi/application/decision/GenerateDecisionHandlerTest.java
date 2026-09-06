@@ -331,6 +331,12 @@ class GenerateDecisionHandlerTest {
   }
 
   private static class FakeSourceControlPort implements SourceControlPort {
+
+    @Override
+    public java.util.List<String> listFiles(com.cdi.common.domain.id.TenantId tenantId, com.cdi.common.domain.id.RepositoryId repositoryId, String commitSha) {
+        return java.util.List.of();
+    }
+
     final List<StatusCall> statusChecks = new ArrayList<>();
     boolean failStatusCheck;
 
@@ -370,3 +376,4 @@ class GenerateDecisionHandlerTest {
       List<DecisionReason> reasons,
       String detailsUrl) {}
 }
+

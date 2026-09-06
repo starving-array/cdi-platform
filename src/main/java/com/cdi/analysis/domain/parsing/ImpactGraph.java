@@ -240,7 +240,7 @@ public final class ImpactGraph {
     List<ImpactNode> nodeList = allNodeKeys.stream()
         .map(k -> {
           String[] parts = k.split(":", 2);
-          if (parts.length >= 2) {
+          if (parts.length >= 2 && !parts[0].isBlank()) {
             return new ImpactNode(parts[0], parts[1]);
           }
           return null;

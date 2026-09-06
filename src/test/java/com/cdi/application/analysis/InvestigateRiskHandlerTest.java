@@ -117,7 +117,7 @@ class InvestigateRiskHandlerTest {
         new InvestigationFinding("Payment path risk",
             "Past incident on the same path", List.of(incidentId))));
 
-    handler.handle(new InvestigateRiskCommand(runId));
+    handler.handle(new InvestigateRiskCommand(runId, null));
 
     assertEquals(1, agentPort.calls);
     AgentInvestigation saved = agentInvestigationRepository.saved.get(0);
@@ -144,7 +144,7 @@ class InvestigateRiskHandlerTest {
         new InvestigationFinding("Finding A", "Explanation A", List.of(incidentId)),
         new InvestigationFinding("Finding B", null, List.of())));
 
-    handler.handle(new InvestigateRiskCommand(runId));
+    handler.handle(new InvestigateRiskCommand(runId, null));
 
     AgentInvestigation saved = agentInvestigationRepository.saved.get(0);
     assertEquals(2, saved.getFindings().size());
@@ -161,7 +161,7 @@ class InvestigateRiskHandlerTest {
     agentPort.output = new InvestigationFindings(List.of(
         new InvestigationFinding("C", null, List.of(incidentId))));
 
-    handler.handle(new InvestigateRiskCommand(runId));
+    handler.handle(new InvestigateRiskCommand(runId, null));
 
     AgentInvestigation saved = agentInvestigationRepository.saved.get(0);
     assertEquals(List.of(incidentId), saved.getFindings().get(0).citedEvidenceIds());
@@ -177,7 +177,7 @@ class InvestigateRiskHandlerTest {
         new InvestigationFinding("C",
             "claims fabricated evidence", List.of(incidentId, fabricated))));
 
-    handler.handle(new InvestigateRiskCommand(runId));
+    handler.handle(new InvestigateRiskCommand(runId, null));
 
     AgentInvestigation saved = agentInvestigationRepository.saved.get(0);
     List<EvidenceCitation> citations = saved.getFindings().get(0).citations();
@@ -190,7 +190,7 @@ class InvestigateRiskHandlerTest {
     runningRunWithAssessment();
     agentPort.fail = true;
 
-    handler.handle(new InvestigateRiskCommand(runId));
+    handler.handle(new InvestigateRiskCommand(runId, null));
 
     AgentInvestigation saved = agentInvestigationRepository.saved.get(0);
     assertEquals(AgentInvestigation.Status.FAILED, saved.getStatus());
@@ -210,7 +210,7 @@ class InvestigateRiskHandlerTest {
     AnalysisRun run = runningRun(otherTenant);
     riskAssessmentRepository.risk = assessmentFor(run);
 
-    handler.handle(new InvestigateRiskCommand(runId));
+    handler.handle(new InvestigateRiskCommand(runId, null));
 
     // The run belongs to another tenant: the change/risk lookups resolve
     // nothing for the default tenant, so the investigation is a no-op.
@@ -229,7 +229,7 @@ class InvestigateRiskHandlerTest {
     existing.complete(List.of(), NOW.minusSeconds(30));
     agentInvestigationRepository.byRunId.put(runId.value(), existing);
 
-    handler.handle(new InvestigateRiskCommand(runId));
+    handler.handle(new InvestigateRiskCommand(runId, null));
 
     assertEquals(0, agentPort.calls);
     assertTrue(agentInvestigationRepository.saved.isEmpty());
@@ -243,7 +243,7 @@ class InvestigateRiskHandlerTest {
     analysisRunRepository.byId.put(runId.value(), run);
     openChange();
 
-    handler.handle(new InvestigateRiskCommand(runId));
+    handler.handle(new InvestigateRiskCommand(runId, null));
 
     assertEquals(0, agentPort.calls);
     assertTrue(agentInvestigationRepository.saved.isEmpty());
@@ -252,7 +252,7 @@ class InvestigateRiskHandlerTest {
 
   @Test
   void missingRunIsANoOp() {
-    handler.handle(new InvestigateRiskCommand(AnalysisRunId.generate()));
+    handler.handle(new InvestigateRiskCommand(AnalysisRunId.generate(), null));
 
     assertEquals(0, agentPort.calls);
     assertTrue(agentInvestigationRepository.saved.isEmpty());
@@ -266,7 +266,7 @@ class InvestigateRiskHandlerTest {
     agentPort.output = new InvestigationFindings(List.of(
         new InvestigationFinding("C", null, List.of())));
 
-    handler.handle(new InvestigateRiskCommand(runId));
+    handler.handle(new InvestigateRiskCommand(runId, null));
 
     assertEquals(before.getScore(), riskAssessmentRepository.risk.getScore());
     assertEquals(before.getLevel(), riskAssessmentRepository.risk.getLevel());
@@ -279,7 +279,7 @@ class InvestigateRiskHandlerTest {
     runningRunWithAssessment();
     agentPort.output = new InvestigationFindings(List.of());
 
-    handler.handle(new InvestigateRiskCommand(runId));
+    handler.handle(new InvestigateRiskCommand(runId, null));
 
     assertFalse(eventPublisher.events.stream()
         .anyMatch(e -> e.getClass().getSimpleName().equals("DecisionGenerated")));
@@ -468,6 +468,12 @@ class InvestigateRiskHandlerTest {
   }
 
   private static class FakeSourceControlPort implements SourceControlPort {
+
+    @Override
+    public java.util.List<String> listFiles(com.cdi.common.domain.id.TenantId tenantId, com.cdi.common.domain.id.RepositoryId repositoryId, String commitSha) {
+        return java.util.List.of();
+    }
+
     static final String SHA = "abc123sha";
     List<FileDiff> diff = List.of();
 
@@ -567,3 +573,4 @@ class InvestigateRiskHandlerTest {
     }
   }
 }
+

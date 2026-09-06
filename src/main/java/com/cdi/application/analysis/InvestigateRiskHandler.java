@@ -170,10 +170,11 @@ public final class InvestigateRiskHandler {
     List<EvidenceRecord> evidence = new ArrayList<>(fetchEvidence(tenantId, change, runContext.run().getCodeSnapshot().commitSha()));
 
     // Compute code intelligence early so it can be included in the LLM prompt
-    // via a structured evidence record, and also used for domain-level
-    // findings enhancement later in the same method.
-    InvestigationCodeIntelligence codeIntelligence =
-        computeCodeIntelligence(tenantId, change, runContext.run().getCodeSnapshot().commitSha());
+    InvestigationCodeIntelligence codeIntelligence = command.codeIntelligence();
+    if (codeIntelligence == null) {
+      // Fallback for older enqueued commands
+      codeIntelligence = new InvestigationCodeIntelligence(runContext.run().getCodeSnapshot().commitSha(), List.of(), List.of(), Set.of(), List.of(), List.of(), List.of(), List.of(), Set.of(), 0, 0);
+    }
 
     // Append a structured code-intelligence evidence record so that the
     // LlmAgentPortAdapter can include full code intelligence in the LLM prompt.
@@ -306,97 +307,6 @@ public final class InvestigateRiskHandler {
     }
     return findings;
   }
-
-  /**
-   * Computes code intelligence from the change under investigation, derived
-   * from the actual source available via the {@link SourceControlPort}. The
-   * result is a lightweight application-level DTO holding structural
-   * information (changed files, method signatures, imported types, impact
-   * graph edges, dependency paths, availability states) that the LLM can
-   * use for investigation prompting. JavaParser AST objects are NOT exposed
-   * through the investigation boundary; all structural information is
-   * converted into application-level models.
-   * <p>
-   * If any port call fails, the method returns an {@link InvestigationCodeIntelligence}
-   * with empty/unknown availability states rather than propagating errors,
-   * so the investigation workflow continues deterministically.
-   */
-  private InvestigationCodeIntelligence computeCodeIntelligence(
-      TenantId tenantId, Change change, String commitSha) {
-    List<String> changedFiles = new ArrayList<>();
-    List<String> changedMethodSignatures = new ArrayList<>();
-    Set<String> importedTypes = new HashSet<>();
-    List<String> directCallers = new ArrayList<>();
-    List<String> directCallees = new ArrayList<>();
-    List<String> impactGraphEdges = new ArrayList<>();
-    List<String> dependencyPaths = new ArrayList<>();
-    Set<String> availabilityStates = new HashSet<>();
-
-    List<FileDiff> diff = null;
-    try {
-      diff = sourceControlPort.getDiff(tenantId, change.getRepositoryId(), commitSha);
-      if (diff != null) {
-        changedFiles = diff.stream().map(FileDiff::path).collect(Collectors.toList());
-      }
-    } catch (PortException e) {
-      availabilityStates.add("UNKNOWN");
-    }
-
-    if (diff != null && !diff.isEmpty()) {
-      try {
-        com.cdi.analysis.domain.CodeContext context = codeContextAssembler.assemble(tenantId, change.getRepositoryId(), commitSha, diff);
-        com.cdi.analysis.domain.parsing.JavaChangeAnalyzer changeAnalyzer = new com.cdi.analysis.domain.parsing.JavaChangeAnalyzer();
-        com.cdi.analysis.domain.parsing.JavaChangeAnalysis changeAnalysis = changeAnalyzer.analyze(context);
-
-        com.cdi.analysis.domain.parsing.JavaDependencyAnalyzer dependencyAnalyzer = new com.cdi.analysis.domain.parsing.JavaDependencyAnalyzer();
-        com.cdi.analysis.domain.parsing.DependencyAnalysis dependencyAnalysis = dependencyAnalyzer.analyze(context);
-
-        com.cdi.analysis.domain.parsing.ImpactGraph impactGraph = new com.cdi.analysis.domain.parsing.ImpactGraph(dependencyAnalysis);
-        com.cdi.analysis.domain.parsing.ImpactGraphResult impactGraphResult = impactGraph.build();
-
-        for (com.cdi.analysis.domain.parsing.JavaFileChange fileChange : changeAnalysis.files()) {
-          importedTypes.addAll(fileChange.imports());
-          for (com.cdi.analysis.domain.parsing.TypeChange type : fileChange.types()) {
-            for (com.cdi.analysis.domain.parsing.MemberChange m : type.methods()) {
-              if (m.changed()) changedMethodSignatures.add(type.name() + "." + m.name());
-            }
-            for (com.cdi.analysis.domain.parsing.MemberChange m : type.constructors()) {
-              if (m.changed()) changedMethodSignatures.add(type.name() + "." + m.name());
-            }
-          }
-        }
-
-        for (com.cdi.analysis.domain.parsing.ImpactGraphEdge edge : impactGraphResult.edges) {
-          impactGraphEdges.add(edge.edgeType() + ":" + edge.sourceMember() + "->" + edge.targetMember());
-          if ("CALLS".equals(edge.edgeType())) directCallees.add(edge.targetMember());
-          if ("CALLED_BY".equals(edge.edgeType())) directCallers.add(edge.sourceMember());
-          if ("TYPE_DEPENDENCY".equals(edge.edgeType())) dependencyPaths.add(edge.targetMember());
-        }
-
-        availabilityStates.add(changedFiles.isEmpty() ? "NO_FILES" : "FILES_RETRIEVED");
-        availabilityStates.add(changedMethodSignatures.isEmpty() ? "NO_METHODS" : "METHODS_PARSED");
-        availabilityStates.add(importedTypes.isEmpty() ? "NO_IMPORTS" : "IMPORTS_PARSED");
-      } catch (Exception e) {
-        availabilityStates.add("UNKNOWN");
-      }
-    } else {
-        availabilityStates.add(changedFiles.isEmpty() ? "NO_FILES" : "FILES_RETRIEVED");
-        availabilityStates.add("NO_METHODS");
-        availabilityStates.add("NO_IMPORTS");
-    }
-
-    return new InvestigationCodeIntelligence(
-        commitSha,
-        changedFiles,
-        changedMethodSignatures,
-        importedTypes,
-        directCallers,
-        directCallees,
-        impactGraphEdges,
-        dependencyPaths,
-        availabilityStates);
-  }
-
 
   private void enqueueEvaluatePolicy(AnalysisRunId runId, TenantId tenantId) {
     jobQueuePort.enqueue("EvaluatePolicyCommand", new EvaluatePolicyCommand(runId),

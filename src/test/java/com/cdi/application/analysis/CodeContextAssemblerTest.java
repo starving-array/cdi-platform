@@ -153,6 +153,12 @@ class CodeContextAssemblerTest {
   // --- Fake SourceControlPort recording the requested state ---
 
   private static class RecordingSourceControlPort implements SourceControlPort {
+
+    @Override
+    public java.util.List<String> listFiles(com.cdi.common.domain.id.TenantId tenantId, com.cdi.common.domain.id.RepositoryId repositoryId, String commitSha) {
+        return java.util.List.of();
+    }
+
     final List<String> requestedPaths = new ArrayList<>();
     final List<String> requestedShas = new ArrayList<>();
     final java.util.Map<String, byte[]> contents = new java.util.HashMap<>();
@@ -195,3 +201,4 @@ class CodeContextAssemblerTest {
     }
   }
 }
+

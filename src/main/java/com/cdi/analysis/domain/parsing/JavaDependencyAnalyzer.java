@@ -36,7 +36,7 @@ public final class JavaDependencyAnalyzer {
       try {
         var result = parser.parse(new String(new String(bytes, java.nio.charset.StandardCharsets.UTF_8)));
         result.getResult().ifPresent(cu -> parsed.add(new ParsedFile(file.path(), cu,
-            cu.getPackageDeclaration().map(p -> p.getNameAsString()).orElse(""))));
+            cu.getPackageDeclaration().map(p -> p.getNameAsString()).orElse(""), file.diff())));
       } catch (RuntimeException ignored) {
         // Malformed source degrades (empty contribution), matching PART 5.
       }
@@ -243,9 +243,9 @@ public final class JavaDependencyAnalyzer {
         List.copyOf(callees), List.copyOf(callers));
   }
 
-private boolean isChanged(ParsedFile pf, TypeDeclaration<?> type,
-                          com.github.javaparser.ast.body.CallableDeclaration<?> member) {
-    return true;
+  private boolean isChanged(ParsedFile pf, TypeDeclaration<?> type,
+                            com.github.javaparser.ast.body.CallableDeclaration<?> member) {
+    return pf.fileDiff().changeType() != com.cdi.analysis.domain.FileDiff.ChangeType.UNMODIFIED;
   }
 
   private String resolveOwner(MethodCallExpr call, String enclosingOwner,
@@ -272,6 +272,8 @@ private boolean isChanged(ParsedFile pf, TypeDeclaration<?> type,
       receiverType = resolveTypeName(n.getNameAsString(), simpleToQualified, declaredInContext, other.packageName);
     } else if (scopeExpr instanceof FieldAccessExpr f) {
       receiverType = resolveReceiverType(f, simpleToQualified, declaredInContext, other.packageName);
+    } else if (scopeExpr instanceof ObjectCreationExpr oce) {
+      receiverType = resolveTypeName(oce.getType().getNameAsString(), simpleToQualified, declaredInContext, other.packageName);
     } else {
       return null;
     }
@@ -333,8 +335,11 @@ private boolean isChanged(ParsedFile pf, TypeDeclaration<?> type,
       scopeName = n.getNameAsString();
     } else if (scopeExpr instanceof FieldAccessExpr f && f.getScope() instanceof ThisExpr) {
       scopeName = f.getNameAsString();
+    } else if (scopeExpr instanceof ObjectCreationExpr oce) {
+      // new PaymentService().processPayment() — extract the created type as receiver
+      scopeName = oce.getType().getNameAsString();
     } else {
-      return new CallSite("", method, Resolution.UNRESOLVED, true, "unknown", declaringOwnerQualified, contextMember);
+      return new CallSite(declaringOwnerQualified, method, Resolution.UNRESOLVED, true, "unknown", declaringOwnerQualified, contextMember);
     }
 
     // 1. receiver = another field/variable/parameter in this type
@@ -408,5 +413,5 @@ private boolean isChanged(ParsedFile pf, TypeDeclaration<?> type,
   private record ResolvedTargetCall(String ownerQualified) {}
 
   /** One parsed Java source file plus its package at analysis time. */
-  private record ParsedFile(String path, CompilationUnit cu, String packageName) {}
+  private record ParsedFile(String path, CompilationUnit cu, String packageName, com.cdi.analysis.domain.FileDiff fileDiff) {}
 }
